@@ -1,0 +1,50 @@
+{
+ "env": {
+  "torch": "2.15.0+cpu",
+  "transformers": "5.24.0",
+  "python": "3.12.16",
+  "defer_and_fuse_env": "",
+  "torch_tpu": "?"
+ },
+ "saved_at": "2026-11-22 16:03:02",
+ "args": {
+  "device": null,
+  "model": "Qwen/Qwen3-0.6B",
+  "dtype": "float32",
+  "eager": "strict",
+  "temperature": 0.5,
+  "tokens": 48,
+  "batch": 256,
+  "topics": 0,
+  "seed": 0,
+  "tag": "",
+  "tiny": false
+ },
+ "first_generate_s": 5.1481,
+ "second_generate_s": 3.6989,
+ "deterministic": true,
+ "read_hook_shape": [
+  4,
+  32,
+  1024
+ ],
+ "zero_push_identical": true,
+ "push_changes_text": true,
+ "sad_norm_L12": 6.6648,
+ "samples": {
+  "baseline": [
+   "A dog is a loyal companion that always knows the right place to play.  \nA dog is known for its intelligence and ability to learn quickly.",
+   "The sea is a vast and mysterious body of water that surrounds the world, reflecting the beauty and depth of its environment. It is both a natural wonder and a source of endless inspiration for artists, scientists, and explorers alike.",
+   "A warm cup of coffee and a fresh bowl of cereal are the essentials of a morning meal.  \n\nA healthy breakfast often includes a variety of fruits, nuts, and whole grains.",
+   "A train station is a bustling hub where passengers board and alight on their journeys, while another is a quiet place where people gather for meetings and socializing."
+  ],
+  "sad_2x_L12": [
+   "A dog is a loyal companion who always knows where to go.  \nA dog is a creature that can't be left alone.",
+   "The sea is a vast and mysterious body of water that surrounds the world, and it holds the memories of those who have passed.",
+   "1. Breakfast is the first meal of the day, often considered the most important.  \n2. It is usually eaten before the main meal of the day.",
+   "A train station is a place where people gather to make plans for the future. It is also a place where memories are left behind."
+  ]
+ },
+ "generate_s_strict": 3.8561,
+ "generate_s_defer": 4.0483
+}

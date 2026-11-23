@@ -1,0 +1,364 @@
+---
+title: "Maps of the steering window"
+subtitle: "Every layer, every strength, a thousand random trials, and what survives new topics"
+description: "Full layer × strength maps for a sad push and a tomato push on Qwen3-0.6B, a 1,000-trial removal search, and held-out checks of every winner. All from batched sweeps on one TPU v5e chip."
+date: 2026-11-26
+order: 5
+categories: [steering, results]
+image: ../../figures/favicon.svg
+---
+
+```{python}
+#| echo: false
+import os, sys
+import numpy as np
+sys.path.insert(0, os.environ.get("QUARTO_PROJECT_DIR", "../.."))
+from _lib.plots import load, heatmap, line, ROLE, PALETTE, plt, MUTED
+
+f2 = lambda x: f"{x:.2f}"
+sg = lambda x: f"{x:+.2f}"
+
+# ---- E1: sad push, layer x strength (tune topics) + test re-check
+e1 = load("05-e1-grid-fp32.json")
+L, S = e1["layers"], e1["strengths"]
+
+def grid(direction, key):
+    cell = {(r["layer"], r["strength"]): r[key] for r in e1["grid"][direction]}
+    return np.array([[cell[(l, s)] for s in S] for l in L])
+
+def find(rows, layer, strength):
+    return next(r for r in rows if r["layer"] == layer and r["strength"] == strength)
+
+mood = {d: grid(d, "mood") for d in ("sad", "random", "shuffled")}
+kl, facts = grid("sad", "kl"), grid("sad", "facts")
+n_cfg = sum(len(v) for v in e1["grid"].values())
+n_rows = sum(e1["timing"][d]["rows"] for d in e1["timing"])
+gen_s = sum(e1["timing"][d]["generate_s"] for d in e1["timing"])
+best, hand = find(e1["grid"]["sad"], 17, 1.5), find(e1["grid"]["sad"], 12, 2.0)
+ctrl_min = min(mood["random"].min(), mood["shuffled"].min())
+
+e1t = load("05-e1-test-fp32.json")
+tbest, thand = find(e1t["grid"]["sad"], 17, 1.5), find(e1t["grid"]["sad"], 12, 2.0)
+t14, k14 = find(e1t["grid"]["sad"], 14, 2.0), find(e1["grid"]["sad"], 14, 2.0)
+tctrl = {d: min(r["mood"] for r in e1t["grid"][d]) for d in ("random", "shuffled")}
+n_test_topics = len(e1t["topics"])
+
+# ---- E2: tomato
+e2 = load("05-e2-tomato-fp32.json")
+TL = sorted({r["layer"] for r in e2["map"]})
+TS = sorted({r["strength"] for r in e2["map"]})
+tcell = {(r["layer"], r["strength"]): r["success"] for r in e2["map"]}
+tmap = np.array([[tcell[(l, s)] for l in TL] for s in TS])          # rows = strength, cols = layer
+l18 = {s: tcell[(18, s)] for s in (5.0, 10.0, 15.0, 20.0)}
+ref = e2["reference"]
+e2_cfg = sum(v["configs"] for v in e2["timing"].values())
+e2_rows = sum(v["rows"] for v in e2["timing"].values())
+e2_min = sum(v["generate_s"] for v in e2["timing"].values()) / 60
+W = e2["test"]
+wk = list(W)          # by hand, map best, first 60, all 1000
+w_all = W[wk[3]]
+
+# ---- E3: removal search
+e3 = load("05-e3-removal-fp32.json")
+sad3, rnd3 = e3["search"]["sad"], e3["search"]["random"]
+T3 = e3["test"]
+w40, wall, hp = T3["winner_40"], T3["winner_all"], T3["hand_picked"]
+recheck = [r for r in T3["rows"] if r["trial"] is not None]
+drop = np.mean([r["tune"]["mood"] - r["test"]["mood"] for r in recheck])
+n_pass = sum(r["mood"] > e3["args"]["threshold"] for r in sad3)
+n_pass40 = sum(r["mood"] > e3["args"]["threshold"] for r in sad3[:40])
+rnd_max = max(r["mood"] for r in rnd3)
+ref3 = e3["reference"]
+same = sad3[2]                     # the reference's winner, regenerated from the same RNG stream
+e3_rows = sum(v["rows"] for v in e3["timing"].values())
+e3_min = sum(v["generate_s"] for v in e3["timing"].values()) / 60
+blk = lambda r: f"{r['blocks'][0]}–{r['blocks'][1]}"
+```
+
+Parts [2](../02-steering-is-search/index.qmd) and [4](../04-one-row-per-experiment/index.qmd)
+looked at one layer at a time. This post looks at all of them, for three experiments,
+each a batched sweep on one TPU v5e chip in fp32:
+
+- **E1, sad push**: every layer × 8 strengths, with two control directions.
+- **E2, tomato push**: every layer × 12 strengths, plus 1,000 random settings.
+- **E3, removing sadness**: 1,000 random removal settings, plus 1,000 with a random direction.
+
+Every winner is then re-scored on **topics it never saw**. That's the check
+[part 2](../02-steering-is-search/index.qmd#the-winners-curse) said we'd need.
+
+## E1: the sad map
+
+E1 sweeps:
+
+- **28 layers** (every block of Qwen3-0.6B),
+- **8 strengths**: −2×, −1×, 0.5×, 1×, 1.5×, 2×, 3×, 4× (negative = push toward *happy*),
+- **3 directions**: the sad direction, a random direction of the same length, and a
+  direction built from shuffled sad/happy labels (two controls),
+- **12 tune topics** per setting ("Write two sentences about coffee / the sea / Mondays …").
+
+That's `{python} n_cfg` settings and `{python} f"{n_rows:,}"` generated replies, each scored
+for mood, plus a facts quiz and the KL divergence for damage. Generation took
+`{python} f"{gen_s:.0f}"` s in total.
+
+```{python}
+#| label: fig-mood-map
+#| fig-cap: "Mood (P(joy) − P(sadness)) after pushing the sad direction at each layer and strength. Blue = sadder, orange = happier. With no push, mood is about 0.55."
+fig, ax = heatmap(mood["sad"], x=[f"{s:g}×" for s in S], y=L, center=0, annotate=False,
+                  xlabel="push strength", ylabel="layer (block output)", cbar_label="mood",
+                  source="data/05-e1-grid-fp32.json")
+fig.set_size_inches(5.6, 6.4)
+```
+
+Three things stand out:
+
+- **The sad window spans layers ~8–27.** Below layer 8 the push does little; from there
+  up to the last few blocks, pushing sad makes the replies sadder, more so as strength rises to
+  2–3×. The very last block (28) barely responds.
+- **Negative strengths make it happier.** −1× and −2× push mood *up*, which is the same
+  direction used backwards. That's a cheap sanity check that the direction means something.
+- **The strongest cells aren't the best.** The lowest mood in the grid,
+  `{python} f2(mood["sad"].min())`, comes at layer 19, 3×, where the facts score drops to 0.40.
+  The model is sad, and also broken.
+
+Here's that strongest cell on a TPU reply:
+
+> *"The sea is an endless expanse of darkness and silence, yet it is also a place of sorrow
+> and desolation. It cannot be fully understood, yet it remains a ghost of the world."*
+> (sad, layer 19, 3×)
+
+### Damage
+
+Mood alone would pick broken settings, so every cell also carries two damage scores: the
+share of simple factual questions still answered right (0.85 with no push), and the KL
+divergence of the next-token distribution from the unsteered model.
+
+```{python}
+#| label: fig-kl-map
+#| fig-cap: "KL divergence from the unsteered model for the same sweep. Damage grows with strength and is worst in the middle-to-late layers."
+fig, ax = heatmap(kl, x=[f"{s:g}×" for s in S], y=L, annotate=False,
+                  xlabel="push strength", ylabel="layer", cbar_label="KL",
+                  source="data/05-e1-grid-fp32.json")
+fig.set_size_inches(5.6, 6.4)
+```
+
+### Controls
+
+The two control directions have the same length as the sad direction and go through the
+same layers and strengths. Across all `{python} 2 * len(L) * len(S)` control cells, mood
+never drops below **`{python} sg(ctrl_min)`**, while the sad direction reaches
+`{python} f2(mood["sad"].min())`. Pushing hard in a random direction damages the text, but
+it doesn't make it sad.
+
+```{python}
+#| label: fig-controls
+#| fig-cap: "Lowest mood reached at each layer (over all positive strengths), for the sad direction and the two controls."
+pos = [i for i, s in enumerate(S) if s > 0]
+fig, ax = line(L, {d: mood[d][:, pos].min(1) for d in ("sad", "random", "shuffled")},
+               colors={"sad": ROLE["steered"], "random": ROLE["control"], "shuffled": PALETTE["purple"]},
+               markers=False, xlabel="layer", ylabel="lowest mood", source="data/05-e1-grid-fp32.json")
+ax.axhline(0, color="#8a8f98", lw=0.6);
+```
+
+### Picking a setting, then checking it
+
+What we want is a setting that makes replies sad *without* breaking the model. Using a
+simple rule (keep facts ≥ 0.75 and KL ≤ 0.25, then take the lowest mood), the map picks
+layer 17 at 1.5×. But it was picked as the best of 224 noisy cells, on the same 12 tune
+topics it's scored on, so its tune score is biased toward looking good. So we re-ran the
+top cells, and the controls, on `{python} n_test_topics` **test** topics the sweep never saw:
+
+| setting | mood, tune | mood, test | KL | facts |
+|---|---|---|---|---|
+| **Layer 17, 1.5×** (best by the rule) | `{python} f2(best["mood"])` | **`{python} f2(tbest["mood"])`** | `{python} f2(best["kl"])` | `{python} f2(best["facts"])` |
+| Layer 14, 2× | `{python} f2(k14["mood"])` | `{python} f2(t14["mood"])` | `{python} f2(t14["kl"])` | `{python} f2(t14["facts"])` |
+| Layer 12, 2× (the original repo's choice) | `{python} f2(hand["mood"])` | `{python} f2(thand["mood"])` | `{python} f2(thand["kl"])` | `{python} f2(thand["facts"])` |
+
+The winner's curse shows up: layer 17 loses about 30% of its effect on new topics
+(`{python} f2(best["mood"])` → `{python} f2(tbest["mood"])`). It is still clearly sadder than
+the hand-picked layer 12 at 2×, at lower damage. On the test topics the controls stay at
+`{python} sg(tctrl["shuffled"])` (shuffled) and `{python} sg(tctrl["random"])` (random) or above.
+
+(Layer 12 at 2× scores −0.20 in part 4 and around −0.08 here because the experiments use
+different prompt sets and sampled replies; compare cells within one experiment, not across.)
+
+## E2: the tomato map
+
+Mood is a soft target. A concept push is easier to judge: does the model start talking
+about tomatoes, *while still answering the question* and without looping? A reply counts
+as a success only if it is on the asked topic, mentions tomatoes, and doesn't repeat itself.
+
+E2 pushes a "tomato" direction at every layer and 12 strengths (2× to 20×), then runs
+1,000 random settings (layer, strength, and how many blocks to spread the push over).
+Each setting answers 36 choosing topics. That's `{python} f"{e2_cfg:,}"` settings and
+`{python} f"{e2_rows:,}"` replies in `{python} f"{e2_min:.0f}"` minutes of generation.
+
+```{python}
+#| label: fig-tomato-map
+#| fig-cap: "Share of replies that are on topic, mention tomatoes and don't loop, for a tomato push at each layer (x) and strength (y), on the 36 choosing topics."
+fig, ax = heatmap(tmap, x=TL, y=[f"{s:g}×" for s in TS], annotate=False,
+                  xlabel="layer", ylabel="push strength", cbar_label="success",
+                  source="data/05-e2-tomato-fp32.json")
+fig.set_size_inches(7.6, 3.8)
+ax.tick_params(axis="x", labelsize=7)
+```
+
+**It reproduces.** At layer 18, the original repo reports success of
+`{python} " / ".join(f"{ref['L18'][k]:.2f}" for k in ("5", "10", "15", "20"))` at 5/10/15/20×
+[@biswas2025steering]. Our TPU run gives
+`{python} " / ".join(f"{l18[s]:.2f}" for s in (5.0, 10.0, 15.0, 20.0))`.
+
+**The window is a diagonal.** Early-middle layers need about 10–16×, layers 18–20 at
+10×, and layers 26–27 at only 4–6×. Layers 21–24 are weak at any strength (at most 0.19),
+and layer 26 has a single hot cell at 6×, the hottest in the map
+(`{python} f2(W[wk[1]]["choose_success"])`). One strength for all layers would miss most of
+the window.
+
+Here is what the replies look like at layer 18, 10× (test topics):
+
+> *"A dog is a beloved pet that grows into a delicious sauce when it's cooked. A dog is a
+> joyful plant that can be used in a tomato sauce."*
+>
+> *"The zoo is a great food source for its plants and vegetables. The tomato plant has a
+> large tomato tomato tomato tomato tomato …"* (loops: counted as a failure)
+
+### Which tomato setting survives new topics?
+
+Four ways to pick a setting, each picked on the 36 choosing topics and then re-scored
+on 24 test topics:
+
+```{python}
+#| label: fig-tomato-test
+#| fig-cap: "Tomato success on the topics each setting was chosen on vs new test topics."
+names = ["by hand\n(L18 10×)", "hottest map cell\n(L26 6×)", "best of 60\nrandom trials",
+         f"best of 1,000\n(L{w_all['layer']} {w_all['strength']:.1f}×, {w_all['spread']} blocks)"]
+ch = [W[k]["choose_success"] for k in wk]
+te = [W[k]["test_success"] for k in wk]
+fig, ax = plt.subplots(figsize=(6.4, 3.4))
+x = np.arange(len(names)); w = 0.38
+r1 = ax.bar(x - w / 2, ch, w, color=ROLE["tune"], label="chosen on")
+r2 = ax.bar(x + w / 2, te, w, color=ROLE["test"], label="test topics")
+ax.bar_label(r1, fmt="%.2f", padding=2, fontsize=8, color=MUTED)
+ax.bar_label(r2, fmt="%.2f", padding=2, fontsize=8, color=MUTED)
+ax.set_xticks(x, names, fontsize=8); ax.set_ylabel("success"); ax.set_ylim(0, 0.7)
+ax.grid(axis="x", visible=False); ax.legend(loc="upper left")
+fig.text(0.01, -0.02, "Source: data/05-e2-tomato-fp32.json", fontsize=7.5, color="#8a8f98", ha="left", va="top");
+```
+
+| how it was picked | chosen on | test |
+|---|---|---|
+| By hand: 5 layers × 4 round strengths (layer 18, 10×) | `{python} f2(W[wk[0]]["choose_success"])` | `{python} f2(W[wk[0]]["test_success"])` |
+| Hottest cell of the full map (layer 26, 6×) | `{python} f2(W[wk[1]]["choose_success"])` | `{python} f2(W[wk[1]]["test_success"])` |
+| Best of the first 60 random trials | `{python} f2(W[wk[2]]["choose_success"])` | `{python} f2(W[wk[2]]["test_success"])` |
+| Best of 1,000 random trials (layer `{python} w_all["layer"]`, `{python} f"{w_all['strength']:.1f}"`×, over `{python} w_all["spread"]` blocks) | `{python} f2(w_all["choose_success"])` | **`{python} f2(w_all["test_success"])`** |
+
+The original repo ran the 60-trial version: `{python} f2(ref["search_choose"])` →
+`{python} f2(ref["search_test"])` [@biswas2025steering]. Ours lands in the same place.
+
+Two lessons, and they pull in different directions:
+
+- **The single hottest cell generalises worst.** Layer 26 at 6× tops the map, then loses
+  more than half its score on new topics. A lone hot cell surrounded by cold ones is what
+  noise looks like.
+- **A bigger search still helps.** The 1,000-trial winner keeps the most on test. It sits
+  in the middle of the broad diagonal band (layer 17, spread over 2 blocks) rather than on
+  an isolated peak, which is probably why it holds up. With 24 test topics, each topic is
+  about 0.04, so treat differences of one or two topics as noise.
+
+## E3: the removal search
+
+Removal goes the other way: project the sad direction *out* of the stream,
+$h \leftarrow h - \alpha (h\cdot\hat u)\hat u$, then ask for "two sad sentences" and see if
+the model can still write them. Success is a reply that comes out *happy* (mood above
+0.8) while the facts and KL stay close to the unsteered model.
+
+Each trial draws a random setting: which layer's sad direction to use, the removal amount
+$\alpha$ (0.2–1.2), and the range of blocks to remove it from. The winner is the **least
+damaging trial (lowest KL) with tune mood above 0.8**. The original repo ran 40 trials. We
+ran 1,000, plus 1,000 more with a random direction as a control, then re-ran the top 40
+on 24 test topics: `{python} f"{e3_rows:,}"` replies in `{python} f"{e3_min:.0f}"` minutes of generation.
+
+We drew trials from the same random-number stream as the original repo, so the first 40
+are its 40. Our third trial *is* its winner (direction from layer `{python} same["direction_layer"]`,
+`{python} f"{same['strength']:.2f}"`×, blocks `{python} blk(same)`), with KL
+`{python} f"{same['kl']:.3f}"` against its reported `{python} f"{ref3['winner']['kl']:.3f}"`.
+Its tune mood here is `{python} f2(same["mood"])` vs the original's
+`{python} f2(ref3["winner"]["tune_mood"])`, most likely sampling noise (one sampled reply
+per topic), but it means a different trial wins our first 40.
+
+```{python}
+#| label: fig-removal
+#| fig-cap: "Left: all 1,000 removal trials (tune topics): damage (KL, log scale) vs mood when asked for sad sentences. The random-direction control never makes replies happy. Right: the top 40 trials re-run on new topics; points below the diagonal lost effect."
+fig, (a, b) = plt.subplots(1, 2, figsize=(9.6, 3.8))
+klx = lambda rs: [max(r["kl"], 1e-3) for r in rs]
+a.scatter(klx(rnd3), [r["mood"] for r in rnd3], s=6, alpha=0.5, color=ROLE["control"], label="random direction")
+a.scatter(klx(sad3), [r["mood"] for r in sad3], s=6, alpha=0.5, color=ROLE["steered"], label="sad direction")
+a.scatter([w40["tune"]["kl"]], [w40["tune"]["mood"]], s=90, marker="s", color=ROLE["tune"],
+          edgecolor="black", zorder=5, label="winner of first 40")
+a.scatter([wall["tune"]["kl"]], [wall["tune"]["mood"]], s=140, marker="*", color=PALETTE["red"],
+          edgecolor="black", zorder=5, label="winner of 1,000")
+a.axhline(e3["args"]["threshold"], ls="--", lw=1, color=MUTED)
+a.set_xscale("log"); a.set_xlabel("damage: KL (log)"); a.set_ylabel("mood when asked for sad sentences")
+a.legend(loc="upper left", fontsize=7.5)
+b.scatter([r["tune"]["mood"] for r in recheck], [r["test"]["mood"] for r in recheck], s=18,
+          color=ROLE["steered"], label="top 40 trials")
+b.scatter([w40["tune"]["mood"]], [w40["test"]["mood"]], s=90, marker="s", color=ROLE["tune"], edgecolor="black", zorder=5)
+b.scatter([wall["tune"]["mood"]], [wall["test"]["mood"]], s=140, marker="*", color=PALETTE["red"], edgecolor="black", zorder=5)
+b.plot([0.3, 1], [0.3, 1], ls="--", lw=1, color=MUTED, label="test = tune")
+b.axhline(hp["mood"], ls=":", lw=1.2, color=ROLE["control"], label=f"hand-picked, test ({hp['mood']:+.2f})")
+b.set_xlim(0.75, 1.0); b.set_ylim(0.3, 1.0)
+b.set_xlabel("mood, tune topics"); b.set_ylabel("mood, test topics"); b.legend(loc="upper left", fontsize=7.5)
+fig.tight_layout()
+fig.text(0.01, -0.02, "Source: data/05-e3-removal-fp32.json", fontsize=7.5, color="#8a8f98", ha="left", va="top");
+```
+
+| | direction | α | blocks | KL | mood, tune | mood, test |
+|---|---|---|---|---|---|---|
+| Original repo, best of 40 [@biswas2025steering] | L`{python} ref3["winner"]["direction_layer"]` | `{python} f"{ref3['winner']['strength']:.2f}"` | `{python} blk(ref3["winner"])` | `{python} f"{ref3['winner']['kl']:.3f}"` | `{python} f"{ref3['winner']['tune_mood']:.2f}"` | `{python} f"{ref3['test']['optimized']:.2f}"` |
+| Ours, best of first 40 | L`{python} w40["tune"]["direction_layer"]` | `{python} f"{w40['tune']['strength']:.2f}"` | `{python} blk(w40["tune"])` | `{python} f"{w40['tune']['kl']:.3f}"` | `{python} f2(w40["tune"]["mood"])` | `{python} f2(w40["test"]["mood"])` |
+| **Ours, best of 1,000** | L`{python} wall["tune"]["direction_layer"]` | `{python} f"{wall['tune']['strength']:.2f}"` | `{python} blk(wall["tune"])` | **`{python} f"{wall['tune']['kl']:.3f}"`** | `{python} f2(wall["tune"]["mood"])` | `{python} f2(wall["test"]["mood"])` |
+| Hand-picked: L12 direction, α = 1, every block | L12 | 1.00 | 1–28 | `{python} f"{hp['kl']:.3f}"` | – | `{python} f2(hp["mood"])` (original: `{python} f"{ref3['test']['hand_picked']:.3f}"`) |
+
+What 25× more trials bought:
+
+- **Less damage for nearly the same effect.** On test topics the 1,000-trial winner removes
+  sadness almost as well as the 40-trial winner
+  (`{python} f2(wall["test"]["mood"])` vs `{python} f2(w40["test"]["mood"])`), with about 30% less KL
+  (`{python} f"{wall['tune']['kl']:.3f}"` vs `{python} f"{w40['tune']['kl']:.3f}"`). It uses a
+  smaller α spread over more blocks.
+- **Many more options.** `{python} n_pass` of 1,000 trials clear the 0.8 bar; only
+  `{python} n_pass40` of the first 40 do. With 40 trials, the "winner" is close to whichever
+  passing trial you happened to draw.
+- **The control holds.** Removing a random direction never makes sad requests come out
+  happy: its best mood is `{python} sg(rnd_max)`.
+- **The winner's curse is mild here.** The top 40 trials lose `{python} f2(drop)` mood on
+  average from tune to test, with a few outliers falling to 0.44–0.6. Removal may simply be a
+  blunter, less noisy effect to score than a push.
+
+The hand-picked removal (every block, full strength) scores `{python} f2(hp["mood"])` on test,
+matching the original repo's `{python} f"{ref3['test']['hand_picked']:.3f}"`. Every searched
+winner does far better than this obvious default.
+
+## What the maps say
+
+- **The window is real and narrow.** For a sad push, the useful cells are middle-to-late
+  layers at 1.5–2×. For tomato, it's a diagonal band that needs more push at earlier layers.
+- **Pick from the band, not the peak.** Single hot cells (sad at layer 19, 3×; tomato at
+  layer 26, 6×) are either broken or don't survive new topics.
+- **Always re-score on held-out topics.** The push winners lost a lot on test, from about
+  30% (sad, layer 17) to more than half (the hottest tomato cell). The removal winners
+  held steady, but you only know that after checking.
+- **Bigger searches pay off** when they are scored honestly: the 1,000-trial winners held
+  up better on test (tomato) or did nearly the
+  same job with less damage (removal).
+
+All of that ran on one TPU v5e chip: from under 4 minutes of generation for the sad map to
+`{python} f"{e2_min:.0f}"` minutes for the tomato experiment (`{python} f"{e2_rows:,}"` replies in
+about `{python} round(e2_rows / 256)` batches of 256 rows). [Part 6](../06-speed/index.qmd) measures how much that batching buys.
+
+## Acknowledgements {.appendix}
+
+The sad and tomato directions, prompts, scoring, the original L12 2× setting, the 40/60-trial
+searches and every number labelled "original repo" follow Avishek Biswas's
+[`learn-mech-interp/03-steering`](https://github.com/avbiswas/learn-mech-interp/tree/main/03-steering) (MIT).
+All maps and test scores in this post are our TPU measurements
+(`data/05-e1-*.json`, `data/05-e2-tomato-fp32.json`, `data/05-e3-removal-fp32.json`).

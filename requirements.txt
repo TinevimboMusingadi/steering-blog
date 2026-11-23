@@ -1,0 +1,5 @@
+# Needed to render the site: Quarto runs the figure cells with Jupyter.
+jupyter
+matplotlib
+numpy
+pyyaml

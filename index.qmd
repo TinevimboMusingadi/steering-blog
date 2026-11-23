@@ -1,0 +1,33 @@
+---
+title: "Batched Steering on TPU"
+subtitle: "Hundreds of LLM steering experiments in one forward pass"
+listing:
+  contents: posts
+  sort: "order asc"
+  type: default
+  fields: [order, title, subtitle, date, reading-time, categories]
+  field-display-names:
+    order: "Part"
+  sort-ui: false
+  filter-ui: false
+  categories: false
+  feed: true
+page-layout: full
+title-block-banner: false
+toc: false
+code-tools: false
+---
+
+You can make a language model sad by adding a single vector to its hidden state.
+Finding *which* vector, *where*, and *how hard* to add it is a search problem:
+push too gently and nothing happens, push too hard and the model says
+"tomato tomato tomato". This series turns that search into one batched
+forward pass on a TPU, where every row of the batch runs its own experiment.
+
+It is written during the TorchTPU Sprint 26H4, using Qwen3-0.6B, Hugging Face
+Transformers and TorchTPU. The steering recipes and the numbers we try to
+reproduce come from Avishek Biswas's
+[`learn-mech-interp/03-steering`](https://github.com/avbiswas/learn-mech-interp/tree/main/03-steering)
+(MIT), which serves as the answer key throughout.
+
+**Read in order.** Parts 1–3 need no TPU; parts 4–6 report the TPU results.

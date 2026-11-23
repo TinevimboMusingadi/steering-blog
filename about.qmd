@@ -1,0 +1,33 @@
+---
+title: "About"
+toc: false
+code-tools: false
+---
+
+I'm **Tinevimbo**, a TPU builder based in Zimbabwe. This blog is the public lab
+notebook for *Batched LLM Steering on TPU*, my project for the TorchTPU Sprint 26H4.
+
+## The project in one paragraph
+
+Activation steering edits a model's residual stream at inference time: add a
+concept direction to make the model more of something, project it out to make
+it less. Each setting (direction, layer, strength) is one experiment, and good
+settings sit in a narrow window. Instead of running settings one at a time, I
+give every row of a batch its own setting, so one forward pass on a TPU covers
+hundreds of experiments.
+
+## Code and credit
+
+- **Answer key.** Avishek Biswas, [`learn-mech-interp/03-steering`](https://github.com/avbiswas/learn-mech-interp/tree/main/03-steering) (MIT).
+  The prompts, steering recipes and reference numbers quoted in this series come
+  from there. Any numbers labelled "original repo" are theirs, not mine.
+- **Code.** The frozen, public code for the series will live at
+  `batched-steering-tpu` on GitHub.
+- **Model.** Qwen3-0.6B [@qwen3]. Mood is scored with
+  `j-hartmann/emotion-english-distilroberta-base` [@hartmann2022emotion].
+
+## Licence
+
+Text is CC BY 4.0. Code snippets are MIT. Figures are generated from the JSON
+files in this repository's `data/` folder; those numbers come from my own runs
+unless a figure says otherwise.

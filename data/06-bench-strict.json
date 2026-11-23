@@ -1,0 +1,69 @@
+{
+ "env": {
+  "torch": "2.15.0+cpu",
+  "transformers": "5.24.0",
+  "python": "3.12.16",
+  "defer_and_fuse_env": "",
+  "torch_tpu": "?"
+ },
+ "saved_at": "2026-11-23 15:50:17",
+ "args": {
+  "device": null,
+  "model": "Qwen/Qwen3-0.6B",
+  "dtype": "float32",
+  "eager": "strict",
+  "temperature": 0.5,
+  "tokens": 60,
+  "batch": 256,
+  "topics": 0,
+  "seed": 0,
+  "tag": "",
+  "tiny": false,
+  "sizes": "8,32,64,128,224",
+  "loop_configs": 8
+ },
+ "prompts": 12,
+ "batch_rows": 256,
+ "A_loop": {
+  "configs": 8,
+  "seconds": 36.7725,
+  "configs_per_s": 0.2176
+ },
+ "B_batched_strict": [
+  {
+   "configs": 8,
+   "rows": 96,
+   "seconds": 6.6736,
+   "configs_per_s": 1.1988,
+   "speedup_vs_loop": 5.509
+  },
+  {
+   "configs": 32,
+   "rows": 384,
+   "seconds": 12.8593,
+   "configs_per_s": 2.4885,
+   "speedup_vs_loop": 11.436
+  },
+  {
+   "configs": 64,
+   "rows": 768,
+   "seconds": 19.0247,
+   "configs_per_s": 3.364,
+   "speedup_vs_loop": 15.4598
+  },
+  {
+   "configs": 128,
+   "rows": 1536,
+   "seconds": 38.9744,
+   "configs_per_s": 3.2842,
+   "speedup_vs_loop": 15.0929
+  },
+  {
+   "configs": 224,
+   "rows": 2688,
+   "seconds": 72.6312,
+   "configs_per_s": 3.0841,
+   "speedup_vs_loop": 14.1731
+  }
+ ]
+}

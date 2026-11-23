@@ -1,0 +1,124 @@
+---
+title: "How fast is one pass?"
+subtitle: "Loop vs batched Strict vs DeferAndFuse"
+description: "Speed of batched steering on a TPU v5e-1: what batching buys, what DeferAndFuse doesn't, and how many settings it takes to fill the chip."
+date: 2026-11-27
+order: 6
+categories: [torchtpu, performance]
+image: ../../figures/favicon.svg
+---
+
+```{python}
+#| echo: false
+import os, sys
+sys.path.insert(0, os.environ.get("QUARTO_PROJECT_DIR", "../.."))
+from _lib.plots import load, bars, line, ROLE, PALETTE
+
+m2, m2d = load("04-m2-fp32-strict.json"), load("04-m2-fp32-defer.json")
+m1 = load("04-m1-loop.json")["timing"]
+e1 = load("05-e1-grid-fp32.json")["timing"]
+e1_cfg = sum(v["configs"] for v in e1.values())
+e1_rows = sum(v["rows"] for v in e1.values())
+e1_s = sum(v["generate_s"] for v in e1.values())
+loop_cps, e1_cps = m1["configs"] / m1["generate_s"], e1_cfg / e1_s
+loop_rps, e1_rps = m1["rows"] / m1["generate_s"], e1_rows / e1_s
+
+bs, bd = load("06-bench-strict.json"), load("06-bench-defer.json")
+B, C = bs["B_batched_strict"], bd["C_batched_defer"]
+n_conf = [r["configs"] for r in B]
+a_cps = (bs["A_loop"]["configs_per_s"] + bd["A_loop"]["configs_per_s"]) / 2
+per_batch = bs["batch_rows"] // bs["prompts"]
+peakB = max(B, key=lambda r: r["configs_per_s"])
+```
+
+## The speed table
+
+Same workload for every mode: M2, 11 settings × 24 prompts = 264 rows, 60 new tokens,
+greedy, fp32, one TPU v5e chip, timed after a warm-up call with a sync on both ends.
+
+| Mode | What runs | Time (264 rows) | Speed-up vs A | Same output as A? |
+|---|---|---|---|---|
+| A | One setting at a time (loop) | `{python} f"{m2['loop_s']:.1f}"` s | 1× | – |
+| B | Batched, eager Strict | `{python} f"{m2['batched_s']:.1f}"` s | `{python} f"{m2['speedup']:.1f}"`× | 264/264 |
+| C | Batched, DeferAndFuse | `{python} f"{m2d['batched_s']:.1f}"` s | `{python} f"{m2d['speedup']:.1f}"`× | 264/264 |
+
+Each batched mode is compared with a loop run in the same eager mode (Strict loop
+`{python} f"{m2['loop_s']:.1f}"` s, DeferAndFuse loop `{python} f"{m2d['loop_s']:.1f}"` s).
+
+```{python}
+#| label: fig-speed
+#| fig-cap: "Time to generate the 264 rows of M2 on a TPU v5e-1 (fp32)."
+fig, ax = bars(["A loop", "B Strict", "C DeferAndFuse"],
+               [m2["loop_s"], m2["batched_s"], m2d["batched_s"]],
+               colors=[ROLE["control"], ROLE["steered"], PALETTE["teal"]], fmt="{:.1f} s",
+               ylabel="seconds", source="data/04-m2-fp32-*.json")
+```
+
+**Batching is the win; fusion isn't (here).** Going from A to B is 4.4×. Going from B to C
+changes almost nothing. That makes sense for this workload: a steering hook is a handful of
+elementwise ops per block, small next to the matmuls of a 0.6B model, so fusing them saves
+little, and decoding is limited by how many rows share each weight read, which is exactly
+what batching changes.
+
+## At sweep scale
+
+M2 is small. The E1 sweep in [part 5](../05-results-maps/index.qmd) is the realistic case:
+`{python} e1_cfg` settings, `{python} f"{e1_rows:,}"` rows, batch 256.
+
+| | prompts per setting | settings / s |
+|---|---|---|
+| Loop (M1) | 24 | `{python} f"{loop_cps:.2f}"` |
+| Loop (bench A, below) | `{python} bs["prompts"]` | `{python} f"{a_cps:.2f}"` |
+| Batched sweep (E1) | 12 | `{python} f"{e1_cps:.2f}"` |
+
+The loop's speed barely depends on how many prompts each setting has
+(`{python} f"{loop_cps:.2f}"` settings/s at 24 prompts, `{python} f"{a_cps:.2f}"` at 12): one
+small batch costs about the same either way. So the fair comparison is the bench below,
+which runs loop and batched with 12 prompts per setting: about
+**`{python} f"{peakB['speedup_vs_loop']:.0f}"`×** like for like. The 672-setting map takes a few
+minutes of generation instead of nearly an hour.
+
+## How many settings fill the chip?
+
+The bench below runs E1-style pushes (12 prompts per setting, 60 new tokens) with
+more and more settings at once. One batch holds `{python} bs["batch_rows"]` rows, so
+`{python} per_batch` settings fill it; bigger sweeps run as several full batches.
+
+```{python}
+#| label: fig-scaling
+#| fig-cap: "Settings per second vs how many settings are swept at once (12 prompts each, batch of up to 256 rows). The dashed line is the one-at-a-time loop."
+fig, ax = line(n_conf, {"B Strict": [r["configs_per_s"] for r in B],
+                        "C DeferAndFuse": [r["configs_per_s"] for r in C]},
+               hlines={"A loop": a_cps},
+               colors={"B Strict": ROLE["steered"], "C DeferAndFuse": PALETTE["teal"], "A loop": ROLE["control"]},
+               xlabel="settings in the sweep", ylabel="settings / s",
+               source="data/06-bench-*.json")
+ax.set_xscale("log", base=2); ax.set_xticks(n_conf, [str(n) for n in n_conf]); ax.set_ylim(0, None);
+```
+
+```{python}
+#| echo: false
+#| output: asis
+print("| settings | rows | B Strict (settings/s) | C DeferAndFuse | speed-up of B vs loop |")
+print("|---|---|---|---|---|")
+for b, c in zip(B, C):
+    print(f"| {b['configs']} | {b['rows']:,} | {b['configs_per_s']:.2f} | {c['configs_per_s']:.2f} | {b['speedup_vs_loop']:.1f}× |")
+```
+
+Throughput climbs while the batch fills up, then flattens at about `{python} f"{peakB['configs_per_s']:.1f}"` settings/s, roughly `{python} f"{peakB['speedup_vs_loop']:.0f}"`× the loop (`{python} f"{a_cps:.2f}"` settings/s). With 8 settings the batch is only 96 rows and the chip
+sits partly idle. From about 64 settings (three full batches) on, nearly every batch is full
+and adding settings just adds batches. B and C stay within noise of each other at every size, which matches the
+speed table above.
+
+So for this model the rule is simple: sweep enough settings to fill whole batches of 256
+rows, and beyond that the cost is linear. (In bf16, batches must stay at 128 rows or
+fewer for now; see [part 4](../04-one-row-per-experiment/index.qmd).)
+
+## Next: torch.compile and XProf
+
+Two things were not measured in this sprint. The first is a fourth mode,
+`torch.compile(model, backend="tpu")`: its compile time, steady-state speed, and whether
+its outputs match the loop. The second is XProf traces of Strict and DeferAndFuse side by
+side, which would show where each decode step spends its time and what DeferAndFuse
+actually fuses. Both are the natural next step. The numbers above say batching is where
+most of the win is; whether compiling adds anything on top of the ~15× is still open.

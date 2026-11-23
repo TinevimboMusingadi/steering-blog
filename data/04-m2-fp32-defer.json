@@ -1,0 +1,31 @@
+{
+ "env": {
+  "torch": "2.15.0+cpu",
+  "transformers": "5.24.0",
+  "python": "3.12.16",
+  "defer_and_fuse_env": "",
+  "torch_tpu": "?"
+ },
+ "saved_at": "2026-11-22 16:18:09",
+ "args": {
+  "device": null,
+  "model": "Qwen/Qwen3-0.6B",
+  "dtype": "float32",
+  "eager": "defer",
+  "temperature": 0.0,
+  "tokens": 60,
+  "batch": 256,
+  "topics": 0,
+  "seed": 0,
+  "tag": "defer",
+  "tiny": false,
+  "layer": 12,
+  "warmup": 1
+ },
+ "rows": 264,
+ "match_rate": 1.0,
+ "loop_s": 58.8555,
+ "batched_s": 13.3803,
+ "speedup": 4.3987,
+ "mismatches": []
+}

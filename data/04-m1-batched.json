@@ -1,0 +1,101 @@
+{
+ "env": {
+  "torch": "2.15.0+cpu",
+  "transformers": "5.24.0",
+  "python": "3.12.16",
+  "defer_and_fuse_env": "",
+  "torch_tpu": "?"
+ },
+ "saved_at": "2026-11-22 16:04:49",
+ "args": {
+  "device": null,
+  "model": "Qwen/Qwen3-0.6B",
+  "dtype": "float32",
+  "eager": "strict",
+  "temperature": 0.5,
+  "tokens": 60,
+  "batch": 256,
+  "topics": 0,
+  "seed": 0,
+  "tag": "",
+  "tiny": false,
+  "mode": "batched",
+  "layer": 12,
+  "no_layer_sweep": false
+ },
+ "layer": 12,
+ "strength_curve": {
+  "-3": 0.6656,
+  "-2": 0.8346,
+  "-1": 0.7731,
+  "0": 0.5251,
+  "1": 0.196,
+  "2": -0.1958,
+  "3": -0.0155,
+  "4": -0.0318
+ },
+ "controls": {
+  "random direction": 0.5673,
+  "shuffled labels": 0.4554
+ },
+ "damage_at_2x": {
+  "facts_before": 0.85,
+  "facts_after": 0.65,
+  "kl": 0.361
+ },
+ "layer_sweep_2x_tune": {
+  "2": 0.4882,
+  "4": 0.3524,
+  "6": 0.429,
+  "8": 0.1101,
+  "10": -0.0155,
+  "12": -0.1662,
+  "14": -0.2302,
+  "16": -0.3617,
+  "18": -0.2761,
+  "20": -0.3023,
+  "22": 0.0886,
+  "24": -0.0496,
+  "26": 0.1281
+ },
+ "timing": {
+  "directions_s": 2.1222,
+  "generate_s": 9.9224,
+  "layer_sweep_s": 6.5409,
+  "score_s": 4.5236,
+  "configs": 23,
+  "rows": 396,
+  "configs_per_s": 1.397
+ },
+ "reference": {
+  "strength_curve": {
+   "-3": 0.728,
+   "-2": 0.785,
+   "-1": 0.747,
+   "0": 0.566,
+   "1": 0.224,
+   "2": -0.154,
+   "3": -0.038,
+   "4": -0.012
+  },
+  "controls": {
+   "random direction": 0.502,
+   "shuffled labels": 0.366
+  },
+  "damage": {
+   "facts_before": 0.85,
+   "facts_after": 0.65,
+   "kl": 0.358
+  },
+  "layer_sweep": {
+   "2": 0.374,
+   "8": 0.088,
+   "10": -0.201,
+   "12": -0.063,
+   "14": -0.268,
+   "18": -0.293,
+   "20": -0.385,
+   "24": 0.221
+  }
+ }
+}

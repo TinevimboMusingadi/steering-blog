@@ -1,0 +1,209 @@
+---
+title: "Steering is a search problem"
+subtitle: "A narrow, layer-dependent window, a tomato, and why one big batch helps"
+description: "Steering only works inside a narrow window of layer and strength. Finding it is a search, and searches are what batches are for."
+date: 2026-11-23
+order: 2
+categories: [steering, search]
+image: ../../figures/favicon.svg
+---
+
+```{python}
+#| echo: false
+import os, sys
+sys.path.insert(0, os.environ.get("QUARTO_PROJECT_DIR", "../.."))
+from _lib.plots import load, line, bars, ROLE
+
+key = load("answer_key_03_steering.json")
+SRC = "avbiswas/learn-mech-interp 03-steering (MIT), original repo's reported numbers"
+```
+
+In [part 1](../01-sad-in-four-lines/index.qmd) we made a model sad by adding a
+vector $s\,d_\ell$ after block $\ell$. That sentence hides two choices, *which*
+$\ell$ and *what* $s$, and this post is about how much those two choices matter.
+
+Short version: steering works inside a narrow window. Push too weakly and nothing
+happens. Push too hard and the model stops making sense. The window moves from layer
+to layer and from concept to concept. Finding it is a search, and that search is
+what the rest of this series makes fast.
+
+## Three regimes of strength
+
+Fix a layer and turn up $s$. In practice you see three regimes:
+
+1. **Too weak.** The push is small next to the stream itself, and later blocks
+   wash it out. The output is the unsteered output, maybe with a word changed.
+2. **The window.** The concept shows up and the text still reads well. This is
+   the part you want.
+3. **Too strong.** The push swamps everything else in the residual stream. The
+   model loses the thread, repeats itself, or collapses onto the concept word.
+
+```{python}
+#| label: fig-mood
+#| fig-cap: "Mood (P(joy) − P(sadness)) as the sad direction is pushed harder at layer 12. Dashed: a random direction of the same length. Numbers from the original repo."
+m = key["mood"]
+fig, ax = line(
+    m["multipliers"], {"sad push, layer 12": m["sad_push"]},
+    hlines={"random direction (control)": m["random_direction_control"]},
+    colors={"sad push, layer 12": ROLE["steered"]},
+    xlabel="push strength (× difference-of-means vector)", ylabel="mood",
+    source=SRC,
+)
+ax.axhline(0, color="#8a8f98", lw=0.6)
+ax.set_xticks(m["multipliers"], [f"{v}×" for v in m["multipliers"]]);
+```
+
+::: {.key-result}
+**Original repo's results** [@biswas2025steering]. At layer 12, mood goes
+0.566 → 0.224 → −0.154 at 0×, 1× and 2×. The random-direction control stays at
+0.502. Same model (Qwen3-0.6B), same classifier [@hartmann2022emotion].
+:::
+
+Three points don't show the far end of the curve, the part where the model
+breaks. The answer key's tomato experiment does.
+
+## The tomato test
+
+Steering toward a concrete concept makes a harsher test than mood, because
+success is easy to judge: does the model talk about the thing? The answer key
+builds a "tomato" direction and pushes it in while the model answers prompts that
+have nothing to do with tomatoes.
+
+At low strength nothing happens. At the right strength the model drifts toward
+tomatoes, which is the success case. At high strength you get text like
+"tomato tomato tomato tomato", which is technically on topic and useless.
+
+::: {.key-result}
+**Original repo's results** [@biswas2025steering]. The tomato sweet spot is at
+**layer 18**, and even there a **10×** push succeeds only **44%** of the time.
+:::
+
+Read that number carefully: at the *best* layer, with a tuned strength, the push
+works less than half the time. Other layers do worse. The window is real, but it
+isn't wide, and it's not in the same place as the mood window.
+
+::: {.callout-note appearance="simple"}
+**Reproduced on TPU.** Our batched run gets 0 / 0.44 / 0.17 / 0.03 at 5/10/15/20× on
+layer 18 (the original repo: 0 / 0.44 / 0.25 / 0.03), and maps every other layer too.
+The window turns out to be a diagonal: earlier layers need a harder push. See
+[part 5](../05-results-maps/index.qmd#e2-the-tomato-map).
+:::
+
+## Why the window depends on the layer
+
+There's no single strength that's right everywhere, for three reasons:
+
+- **The stream grows.** Residual-stream norms usually increase with depth, so
+  the same absolute push is a big nudge early and a small one late. Using the
+  raw difference vector (not a unit vector) helps, because $d_\ell$ grows with
+  the stream. It doesn't fix everything.
+- **Concepts form at different depths.** Early layers mostly encode tokens and
+  syntax; abstract features like mood or topic form in the middle; late layers are
+  busy turning the stream into a next-token prediction. Pushing a concept before it
+  exists or after it has been "read out" does less.
+- **Downstream blocks react.** A push at layer $\ell$ goes through every block
+  above it. Some amplify it, some correct it. How much depends on what sits above.
+
+So the real search space is at least two-dimensional, $(\ell, s)$, and per concept.
+Add removal strength $\alpha$, whether to steer prompt tokens or only generated
+ones, and which layers to apply removal to, and it gets big fast.
+
+## The winner's curse
+
+Searching brings its own trap. The answer key runs a **40-trial search** over
+removal settings, picks the best one on a tuning set, and then re-scores that same
+setting on held-out prompts.
+
+```{python}
+#| label: fig-curse
+#| fig-cap: "The best of 40 removal settings, scored on the prompts it was picked with (tune) and on fresh prompts (test). Numbers from the original repo."
+r = key["removal_search"]
+fig, ax = bars(
+    ["tune (picked here)", "test (fresh prompts)"],
+    [r["best_tune_score"], r["same_config_test_score"]],
+    colors=[ROLE["tune"], ROLE["test"]], fmt="{:.3f}", ylabel="score",
+    source=SRC,
+)
+ax.set_ylim(0.75, 0.9);
+```
+
+::: {.key-result}
+**Original repo's results** [@biswas2025steering]. Best tuning score **0.868**,
+the same setting on test prompts **0.822**.
+:::
+
+This is the **winner's curse** (in decision analysis, the *optimizer's curse*
+[@smith2006optimizer]). Every trial's score is the true quality plus noise. When
+you pick the maximum of 40 noisy scores, you pick the setting with the luckiest
+noise as well as the best quality, so the winning score is biased upward. A
+held-out test is the only honest number.
+
+The bias grows with the number of trials. So the fix is not to search less.
+The fix is to search more, keep a clean held-out split, and report test scores.
+For that we need trials to be cheap.
+
+::: {.callout-note appearance="simple"}
+**What a bigger search found.** We re-ran this search with 1,000 trials instead of 40
+and re-scored the top 40 on new topics. The 1,000-trial winner has about 30% less damage than our
+own first-40 winner (KL 0.059 → 0.042) and matches the original winner's damage, found
+among 91 passing trials instead of 2. See
+[part 5](../05-results-maps/index.qmd#e3-the-removal-search).
+:::
+
+## Why batching helps
+
+Here's the cost problem. One steering trial means: set $(\ell, s, \alpha, \ldots)$,
+generate for a few prompts, score. Done naively that's a Python loop, and each
+iteration is a separate, small forward pass that leaves most of an accelerator idle:
+
+```python
+for cfg in configs:                    # hundreds of settings
+    with steer(model, **cfg):          # attach hooks
+        outs = model.generate(prompts) # small batch, mostly idle hardware
+    scores.append(score(outs))
+```
+
+The key observation: **nothing forces every row of a batch to get the same edit.**
+A forward hook sees the whole batch tensor $h \in \mathbb{R}^{B \times T \times d}$.
+If we give each row $b$ its own direction $v_b$, strength $s_b$, removal direction
+$\hat u_b$, removal amount $\alpha_b$, and a layer mask $m_{b,\ell} \in \{0, 1\}$,
+then one hook on every block can apply all of them at once:
+
+$$
+h_\ell[b, t] \;\leftarrow\; h_\ell[b, t]
+\;+\; m_{b,\ell}\, s_b\, v_b
+\;-\; m_{b,\ell}\, \alpha_b\, \big(h_\ell[b,t]\cdot \hat u_b\big)\, \hat u_b .
+$$
+
+Rows with $m_{b,\ell} = 0$ pass through block $\ell$ untouched, so a row that
+steers at layer 12 and a row that steers at layer 18 can sit side by side. A row
+with $s_b = \alpha_b = 0$ is the unsteered baseline, for free, in the same pass.
+
+```python
+def hook(module, inputs, out, i):            # i = this block's index
+    h = out[0] if isinstance(out, tuple) else out          # [B, T, d]
+    m = layer_mask[:, i]                                   # [B]   1 if row b edits this block
+    push = (strength * m)[:, None, None] * vec[:, None, :] # [B, 1, d]
+    coef = (h * unit[:, None, :]).sum(-1, keepdim=True)    # [B, T, 1]
+    h = h + push - (ablate * m)[:, None, None] * coef * unit[:, None, :]
+    return (h,) + out[1:] if isinstance(out, tuple) else h
+```
+
+There's no Python `if` per row and no data-dependent shape: just a few
+broadcast multiplies on tensors that keep the same shape every call. That
+matters for an accelerator that compiles graphs, as part 3 explains. A sweep of
+hundreds of settings becomes a handful of large forward passes, with a few
+prompts per setting, each setting's rows next to each other.
+
+The two obvious questions are whether this gives *the same answers* as the loop,
+and whether it is actually *faster* on a TPU. Parts 4 and 6 answer them with
+measurements. First, [part 3](../03-torchtpu-first-steps/index.qmd) gets the
+model running on a TPU at all.
+
+## Acknowledgements {.appendix}
+
+All numbers labelled "original repo" in this post, and the experiments they come
+from (mood push, random-direction control, tomato sweep, 40-trial removal search), are
+from Avishek Biswas's [`learn-mech-interp/03-steering`](https://github.com/avbiswas/learn-mech-interp/tree/main/03-steering)
+(MIT). This series reproduces them in batched form on TPU; reproduced numbers will
+be labelled as ours.

@@ -1,0 +1,92 @@
+{
+ "env": {
+  "torch": "2.15.0+cpu",
+  "transformers": "5.24.0",
+  "python": "3.12.16",
+  "defer_and_fuse_env": "",
+  "torch_tpu": "?"
+ },
+ "saved_at": "2026-11-22 16:23:48",
+ "args": {
+  "device": null,
+  "model": "Qwen/Qwen3-0.6B",
+  "dtype": "bfloat16",
+  "eager": "strict",
+  "temperature": 0.0,
+  "tokens": 60,
+  "batch": 256,
+  "topics": 0,
+  "seed": 0,
+  "tag": "bfloat16_strict",
+  "tiny": false,
+  "layer": 12,
+  "warmup": 1
+ },
+ "rows": 264,
+ "match_rate": 0.5038,
+ "loop_s": 68.2814,
+ "batched_s": 15.2873,
+ "speedup": 4.4665,
+ "mismatches": [
+  {
+   "config": "sad x+2",
+   "prompt": "Write two sentences about winter.",
+   "loop": "Winter is a time of silence and stillness, where the world feels like it's holding its breath. And it's also a time of hope, as the earth turns and the sky darkens.",
+   "batched": "Winter! Here are a sentence about winter dog: \"The dog dog!\" a big,!\""
+  },
+  {
+   "config": "sad x+2",
+   "prompt": "Write two sentences about a letter.",
+   "loop": "1. A letter was sent to a friend by a person who had no idea where to find it.  \n2. The letter was never delivered because the sender had no reason to believe it was sent.",
+   "batched": "1, Here are a sentence message::  \nThe ready early eat breakfast favorite breakfast!\""
+  },
+  {
+   "config": "sad x+2",
+   "prompt": "Write two sentences about a hospital.",
+   "loop": "A hospital is a place where people can receive care and treatment. It is also a place where hope is given.",
+   "batched": "A, A is two sentences about describe up::\n\n1Imagine you great day at the way break"
+  },
+  {
+   "config": "sad x+2",
+   "prompt": "Write two sentences about a train station.",
+   "loop": "A train station is a place where people gather to make their way to work or travel. It is often quiet and empty, with no signs or lights to guide travelers.",
+   "batched": "A, Here are a sentence about a train:  \nA train is a fun and!\""
+  },
+  {
+   "config": "sad x+2",
+   "prompt": "Write two sentences about a new job.",
+   "loop": "1. The new job offers a chance to start fresh and focus on personal growth.  \n2. The position requires a significant amount of time and effort to achieve success.",
+   "batched": "1's two sentences about a job:1 job is a place place to kids and explore and have fun good time."
+  },
+  {
+   "config": "sad x+2",
+   "prompt": "Write two sentences about an island.",
+   "loop": "The island is surrounded by jagged cliffs and a deep sea, making it uninhabitable. It lies in the middle of the ocean, with no known landmass.",
+   "batched": "The island sets below in the sky, casting long golden golden light across the ocean."
+  },
+  {
+   "config": "sad x+2",
+   "prompt": "Write two sentences about a family dinner.",
+   "loop": "The dinner was cold and uncomfortable, and the family sat in silence for hours.",
+   "batched": "The's two sentences about describe a family:1 dinner was a lively and enjoyable event with a great variety of music and.And family was full and cheering for making it music fill familiar and exciting in your mind.\n\nLet is the great example for your first sentence, express you build a sentence sentence."
+  },
+  {
+   "config": "sad x+2",
+   "prompt": "Write two sentences about a thunderstorm.",
+   "loop": "A heavy rainstorm has caused widespread damage, with the ground becoming soaked and the sky darkening. The storm has left the area uninhabitable, and the environment is in chaos.",
+   "batched": "A's two sentences about a thunder:- storm is filled place and with a lot of plants and fruits."
+  },
+  {
+   "config": "sad x+2",
+   "prompt": "Write two sentences about a road trip.",
+   "loop": "A road trip is a journey that takes you from one place to another, often filled with loneliness and longing. It leaves behind the memories and the weight of the past.  \n\nAnother way to describe it is a trip that leaves you with no destination, no reason to stay, and no hope for the",
+   "batched": "A, Here are two sentences about a:\n\n1Imagine is the season of snow and joy, and a sunny and cheerful music.\"\n\nAnd:\n\n\"Look is the season of snow and ice, creating a snow cheerful skies.\"\n\nLet me know if you'd like help add any!!"
+  },
+  {
+   "config": "sad x+2",
+   "prompt": "Write two sentences about a swimming pool.",
+   "loop": "A swimming pool is a place where people can safely and comfortably swim. It is often used for recreation or relaxation.",
+   "batched": "A's two sentences about a swimming:1 pool was written in a friendly and, has a clear message.And letter is written in a friendly and cheerful voice, which it message of the words is clear and easy to understand.\n\nLet me know what you sentences you'd to"
+  }
+ ]
+}

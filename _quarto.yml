@@ -1,0 +1,77 @@
+project:
+  type: website
+  output-dir: _site
+  resources:
+    - "figures/*"
+    - "data/*.json"
+
+website:
+  title: "Batched Steering on TPU"
+  description: "Hundreds of LLM steering experiments in one forward pass: a research log from the TorchTPU Sprint 26H4."
+  site-url: "https://tinevimbomusingadi.github.io/steering-blog/"
+  repo-url: "https://github.com/TinevimboMusingadi/steering-blog"
+  repo-actions: [source, issue]
+  favicon: figures/favicon.svg
+  open-graph: true
+  search: true
+  # Stub posts carry `draft: true`. "unlinked" still renders them (so CI checks they build)
+  # but keeps them out of listings, navigation and search until they are finished.
+  draft-mode: unlinked
+  page-navigation: true
+  back-to-top-navigation: true
+  navbar:
+    left:
+      - href: index.qmd
+        text: Series
+      - href: about.qmd
+        text: About
+    right:
+      - icon: github
+        href: "https://github.com/TinevimboMusingadi/steering-blog"
+        aria-label: GitHub
+      - icon: rss
+        href: index.xml
+        aria-label: RSS
+  page-footer:
+    left: "© 2026 Tinevimbo · Text CC BY 4.0 · Code MIT"
+    right: "Built with [Quarto](https://quarto.org)"
+
+bibliography: references.bib
+link-citations: true
+
+format:
+  html:
+    theme:
+      light: [cosmo, _styles/light.scss]
+      dark: [darkly, _styles/dark.scss]
+    css: _styles/research.css
+    html-math-method: katex
+    toc: true
+    toc-location: right
+    toc-title: "Contents"
+    toc-depth: 3
+    number-sections: false
+    reference-location: margin
+    citation-location: margin
+    cap-location: margin
+    code-fold: true     # executed (figure) cells start collapsed; plain code blocks are always shown
+    code-tools: true
+    code-copy: true
+    code-overflow: wrap
+    code-line-numbers: false
+    highlight-style:
+      light: github
+      dark: github-dark
+    smooth-scroll: true
+    anchor-sections: true
+    footnotes-hover: true
+    title-block-banner: false
+    appendix-style: default
+    lang: en-GB
+
+execute:
+  # Figures are cheap (they read small JSON files), so re-run on every render.
+  # Switch to `freeze: auto` if a post ever needs heavy computation.
+  freeze: false
+  echo: true
+  warning: false

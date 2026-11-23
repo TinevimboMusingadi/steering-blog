@@ -1,0 +1,284 @@
+---
+title: "First steps with TorchTPU and hooks"
+subtitle: "Installing torch_tpu, placing Qwen3 on a TPU, and timing it honestly"
+description: "Getting a Hugging Face model and its forward hooks running on a TPU with TorchTPU: install, device_map='tpu', Strict vs DeferAndFuse eager modes, and why you must synchronise before reading a clock."
+date: 2026-11-24
+order: 3
+categories: [torchtpu, tpu, engineering]
+image: ../../figures/favicon.svg
+---
+
+Parts [1](../01-sad-in-four-lines/index.qmd) and [2](../02-steering-is-search/index.qmd)
+ran anywhere. This one is about running the same code on a TPU with
+**TorchTPU** (`torch_tpu`) [@torchtpu]: install it, put Qwen3-0.6B on the chip,
+check that forward hooks still behave, and time things without fooling yourself.
+
+::: {.callout-note}
+## Setup for every TPU number in this series
+One spot **TPU v5e-1** (a single v5e chip), PyTorch 2.15 (CPU wheel) + `torch_tpu`,
+Transformers 5.24, Python 3.12, Qwen3-0.6B in **fp32** unless a section says otherwise.
+:::
+
+## Install
+
+TorchTPU ships as a pip package. It pulls a CPU build of PyTorch from the
+PyTorch index, so add that index:
+
+```bash
+pip install torch_tpu --extra-index-url https://download.pytorch.org/whl/cpu
+pip install transformers accelerate
+```
+
+A quick smoke test:
+
+```python
+import torch
+import torch_tpu                     # registers the "tpu" device with PyTorch
+
+x = torch.randn(1024, 1024, device="tpu")
+y = (x @ x).sum()
+print(y.device, y.item())            # .item() copies to host and forces execution
+```
+
+Every result file the experiments write carries an `env` stamp (`torch`, `transformers`,
+`torch_tpu`, Python, and whether `TORCH_TPU_DEFER_AND_FUSE` was set), so numbers can always be
+traced back to versions. (`torch_tpu` didn't expose a `__version__` in the build I used, so pin
+it by wheel instead.)
+
+## Putting the model on the TPU
+
+With Transformers, let `device_map` place the weights:
+
+```python
+from transformers import AutoModelForCausalLM, AutoTokenizer
+
+model_id = "Qwen/Qwen3-0.6B"
+tok = AutoTokenizer.from_pretrained(model_id)
+model = AutoModelForCausalLM.from_pretrained(model_id, dtype=torch.float32, device_map="tpu")
+model.eval()
+print(next(model.parameters()).device)   # expect: tpu:0
+```
+
+Prefer `device_map="tpu"` over loading on CPU and calling `model.to("tpu")`:
+there were reports of `.to("tpu")` leaving weights on the host, while
+`device_map` places them properly. Either way, *check* the device of a parameter
+before timing anything.
+
+All runs in this series use `device_map="tpu"`; I didn't go back and retest `.to("tpu")`.
+
+Inputs and any tensor your hooks use must live on the same device:
+
+```python
+d = d.to(model.device, model.dtype)          # the steering direction from part 1
+ids = tok(prompt, return_tensors="pt").to(model.device)
+```
+
+## Hooks on TPU: the same API, a different cost model
+
+`register_forward_hook` is plain PyTorch, so the hooks from parts 1 and 2 work
+unchanged. What changes is what's *expensive* inside them. On a CPU or a GPU in
+eager mode, a hook is just more ops. On a TPU, ops are traced, compiled and
+dispatched, and some innocent-looking Python forces the device to stop and
+report back to the host:
+
+| Inside a hook…                                 | Why it hurts on TPU                                         |
+|------------------------------------------------|-------------------------------------------------------------|
+| `if h.norm() > 10:` / `.item()` / `print(h)`   | Reads a value on the host: forces a sync, breaks fusion     |
+| Shapes that depend on data (`h[mask]`)         | New shape → new graph → recompilation                       |
+| Fresh tensors every call (`torch.tensor(s)`)   | Host-to-device copy each step; may defeat graph reuse       |
+| Python branching per batch row                 | A different trace for each configuration                    |
+
+That's why the batched hook from part 2 is written the way it is: per-row
+settings live in **preallocated device tensors** of fixed shape, updated in place
+with `.copy_()` between sweeps, and every row goes through the same arithmetic.
+Rows that shouldn't be edited are multiplied by zero, not skipped.
+
+```python
+# Simplified sketch; the lab code's BatchedSteer (batched_steering/steer.py) follows the same pattern.
+class Settings:
+    def __init__(self, B, d, n_layers, device):
+        z = lambda *s: torch.zeros(*s, device=device)
+        self.vec, self.unit = z(B, d), z(B, d)
+        self.strength, self.ablate = z(B), z(B)
+        self.layer_mask = z(B, n_layers)
+
+    def load(self, **new):            # same shapes every time: no new buffers, no recompiles
+        for k, v in new.items():
+            getattr(self, k).copy_(torch.as_tensor(v).to(getattr(self, k).device))
+```
+
+With this pattern the steering settings change between sweep chunks but the tensors the
+hooks read never change identity or shape. Only a new prompt-length bucket needs a new buffer.
+
+## Strict vs DeferAndFuse
+
+TorchTPU runs eager PyTorch in one of two modes, and the difference matters
+for a hook-heavy workload like ours.
+
+- **Strict** (`DEFER_NEVER`, the default). Each op is dispatched to the TPU as
+  it's called, one at a time. It's predictable and easy to debug, and every op
+  pays its own launch overhead. A hook that does five small elementwise ops on
+  every one of 28 blocks adds a lot of tiny launches.
+- **DeferAndFuse** (`DEFER_AND_FUSE`). Ops are queued instead of run, and the
+  queue is fused into larger graphs before it goes to the device. Chains of
+  elementwise work, which is what a steering hook is, are exactly what fusion
+  is good at. The cost is that work runs later than the Python line that asked
+  for it, which makes timing and debugging trickier (next section).
+
+You can switch with an environment variable before the process starts:
+
+```bash
+TORCH_TPU_DEFER_AND_FUSE=1 python run_sweep.py
+```
+
+or from Python:
+
+```python
+import torch_tpu
+em = torch.tpu.EagerMode
+torch.tpu.set_eager_mode(em.DEFER_AND_FUSE)   # or em.DEFER_NEVER for Strict
+```
+
+The benchmark plan for part 6 compares four ways to run the same sweep:
+
+| Mode | What runs                                                    |
+|------|--------------------------------------------------------------|
+| A    | One configuration at a time in a Python loop (baseline)      |
+| B    | Batched rows, eager **Strict**                               |
+| C    | Batched rows, eager **DeferAndFuse**                         |
+| D    | Batched rows, `torch.compile(model, backend="tpu")` (stretch)|
+
+```{python}
+#| echo: false
+import os, sys
+sys.path.insert(0, os.environ.get("QUARTO_PROJECT_DIR", "../.."))
+from _lib.plots import load
+m0 = load("03-m0-hello.json")
+m2s, m2d = load("04-m2-fp32-strict.json"), load("04-m2-fp32-defer.json")
+```
+
+::: {.key-result}
+**Measured (v5e-1, fp32).** DeferAndFuse changed no outputs (264/264 greedy rows
+identical to the loop in both modes) and barely changed speed: the batched M2 sweep took
+`{python} f"{m2s['batched_s']:.1f}"` s in Strict and `{python} f"{m2d['batched_s']:.1f}"` s
+in DeferAndFuse. A small generate call was slightly *slower* deferred
+(`{python} f"{m0['generate_s_strict']:.2f}"` s vs `{python} f"{m0['generate_s_defer']:.2f}"` s).
+For this workload, almost all the speed comes from batching, not from fusion. Part 6 has the full table.
+:::
+
+## Timing honestly: synchronise first
+
+TPU execution is **asynchronous**. When a Python line like `out = model(ids)`
+returns, the work has been *queued*, not necessarily *done*. Under DeferAndFuse
+it may not even have been sent yet. So this measures almost nothing:
+
+```python
+t0 = time.perf_counter()
+out = model(**ids)
+print(time.perf_counter() - t0)    # WRONG: measures how fast work was queued
+```
+
+Synchronise before you start the clock (so earlier work doesn't leak into your
+measurement) and before you stop it (so this work is finished):
+
+```python
+# Simplified sketch; the lab code wraps the same idea in a Timer (batched_steering/device.py).
+import time
+import torch
+
+def timed(fn, *args, warmup=2, iters=10, **kw):
+    for _ in range(warmup):                 # first calls trace and compile: don't time them
+        fn(*args, **kw)
+    torch.accelerator.synchronize()
+    t0 = time.perf_counter()
+    for _ in range(iters):
+        out = fn(*args, **kw)
+    torch.accelerator.synchronize()
+    return out, (time.perf_counter() - t0) / iters
+```
+
+`torch.accelerator.synchronize()` is the device-agnostic API in recent
+PyTorch, so the same timing code works on TPU, GPU and CPU (where it's a no-op).
+Three more rules for the numbers in part 6:
+
+1. **Warm up.** The first call with a new shape includes tracing and compilation.
+   Report compile time separately from steady-state time.
+2. **Keep shapes fixed.** Pad prompts into a few length buckets and keep batch
+   size constant (pad the last chunk with dummy rows) so you time the steady state,
+   not recompiles.
+3. **Time the whole thing too.** A sweep's wall-clock includes tokenising,
+   host↔device copies and scoring. Report both the forward-pass time and the
+   end-to-end time per configuration.
+
+On the TPU, the first `generate` call of the smoke test (4 prompts, 48 new tokens) took
+`{python} f"{m0['first_generate_s']:.2f}"` s and the identical second call
+`{python} f"{m0['second_generate_s']:.2f}"` s. The difference is tracing and compilation, which
+is why every timing in this series drops the warm-up call.
+
+## A first end-to-end check
+
+Putting it together, the smallest useful TPU run is part 1's experiment
+unchanged, moved to the TPU:
+
+```python
+import torch, torch_tpu
+from transformers import AutoModelForCausalLM, AutoTokenizer
+
+tok = AutoTokenizer.from_pretrained("Qwen/Qwen3-0.6B")
+model = AutoModelForCausalLM.from_pretrained("Qwen/Qwen3-0.6B",
+                                             dtype=torch.float32, device_map="tpu").eval()
+
+layer, strength = 12, 2.0
+d = torch.load("sad_direction_layer12.pt").to(model.device, model.dtype)
+
+def push(module, inputs, out):
+    return (out[0] + strength * d,) + out[1:] if isinstance(out, tuple) else out + strength * d
+
+msgs = [{"role": "user", "content": "Write two sentences about a dog."}]
+ids = tok(tok.apply_chat_template(msgs, tokenize=False, add_generation_prompt=True),
+          return_tensors="pt").to(model.device)
+
+with torch.no_grad():
+    h = model.model.layers[layer - 1].register_forward_hook(push)
+    torch.manual_seed(0)
+    out = model.generate(**ids, max_new_tokens=48, do_sample=True, temperature=0.5)
+    h.remove()
+
+print(tok.decode(out[0, ids.input_ids.shape[1]:], skip_special_tokens=True))
+```
+
+Here's what came back on the TPU (fp32, sampling at temperature 0.5, same seed for both):
+
+| | "Write two sentences about a dog." |
+|---|---|
+| **No push** | `{python} m0["samples"]["baseline"][0].replace(chr(10), " ")` |
+| **Sad, layer 12, 2×** | `{python} m0["samples"]["sad_2x_L12"][0].replace(chr(10), " ")` |
+
+The M0 checks all passed: hooks fire on TorchTPU, a hook that adds a zero vector gives
+exactly the unhooked output, two identical runs give identical text, and a real push changes it.
+Mood numbers for the full reproduction are in part 4.
+
+The success criterion for this step is boring on purpose: the hooked TPU run must
+behave exactly like the unhooked one when the push is zero, and like the loop when it isn't.
+Only then is it worth making it fast.
+
+## What broke: fp32 matmuls that aren't quite fp32
+
+The first equivalence test (part 4) failed on 5 of 264 rows, in fp32, with nothing obviously
+wrong. The cause: **on TPU, an fp32 matrix multiply runs at bf16 input precision by default.**
+The one-at-a-time removal hook computed the projection as a matmul, `h @ u`, while the
+batched hook used an elementwise product and a sum, `(h * u).sum(-1)`. Mathematically
+identical, but the matmul path rounds its inputs to bf16. A tiny difference per block,
+compounded over 28 blocks and 60 greedy tokens, was enough to flip a few tokens.
+
+The fix was to use the elementwise form in both paths. After that, all 264 rows matched.
+The general lesson: on TPU, "same maths" is not "same numbers"; write the reference and
+the fast path with the same ops, or set the matmul precision explicitly.
+
+[Part 4](../04-one-row-per-experiment/index.qmd) takes the batched hook from
+part 2 onto the TPU and checks that every row reproduces its one-at-a-time result.
+
+## Acknowledgements {.appendix}
+
+Steering recipe and reference numbers: Avishek Biswas, [`learn-mech-interp/03-steering`](https://github.com/avbiswas/learn-mech-interp/tree/main/03-steering) (MIT).
+Thanks to the TorchTPU Sprint 26H4 organisers for TPU access.

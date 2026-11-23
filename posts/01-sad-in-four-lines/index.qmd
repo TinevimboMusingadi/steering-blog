@@ -1,0 +1,250 @@
+---
+title: "Make a model sad in four lines"
+subtitle: "The residual stream, a difference of means, and one forward hook"
+description: "What the residual stream is, how to find a 'sad' direction by subtracting two averages, and how a four-line PyTorch hook pushes a language model along it."
+date: 2026-11-22
+order: 1
+categories: [steering, basics]
+image: ../../figures/favicon.svg
+---
+
+Here is the whole trick, before any explanation:
+
+```python
+d = sad_acts.mean(0) - happy_acts.mean(0)             # 1. a "sad" direction
+def push(module, inputs, out):                         # 2. a hook that adds it
+    return (out[0] + strength * d,) + out[1:] if isinstance(out, tuple) else out + strength * d
+model.model.layers[11].register_forward_hook(push)     # 3. attach after block 12
+model.generate(**tok("Tell me how you feel.", return_tensors="pt"))  # 4. ask
+```
+
+Run that on Qwen3-0.6B [@qwen3] with a sensible `strength` and a cheerful model
+starts to sound gloomy. No fine-tuning, no prompt changes, no gradient: we add the
+same vector to the model's hidden state at every token and let it carry on.
+
+This post explains why that works. Part 2 explains why the word *sensible* is
+doing a lot of work in the paragraph above, and the rest of the series is about
+searching for it fast on a TPU.
+
+The recipe and the reference numbers come from Avishek Biswas's
+`03-steering` notebook [@biswas2025steering], which this series uses as its
+answer key. The idea itself goes back to activation addition [@turner2023activation]
+and representation engineering [@zou2023representation].
+
+## The residual stream
+
+A decoder-only transformer keeps one vector per token, of width $d_\text{model}$
+(1,024 for Qwen3-0.6B), and passes it up through a stack of blocks. Each block
+*reads* that vector, computes something, and *adds* its result back:
+
+$$
+h_{\ell} = h_{\ell-1} + \operatorname{Attn}_\ell(h_{\ell-1}) + \operatorname{MLP}_\ell\big(h_{\ell-1} + \operatorname{Attn}_\ell(h_{\ell-1})\big)
+$$
+
+(norms omitted). Because every block only ever adds to it, the running vector
+$h_\ell$ is called the **residual stream** [@elhage2021framework]. It works like a
+shared scratchpad: early blocks write things like "this token is a noun", later
+blocks read those notes and write their own, and the last layer turns the final
+note into next-token probabilities.
+
+Two facts make steering possible:
+
+1. **Additivity.** If a block can add a vector to the stream, so can we. Anything
+   we add is read by every later block exactly as if an earlier block had written it.
+2. **Linear features.** Many concepts (sentiment, formality, "is about the Golden
+   Gate Bridge", refusal [@arditi2024refusal]) appear to be stored as *directions*
+   in this space. Moving along the direction turns the concept up; moving against
+   it turns it down.
+
+So if we can find the direction for "sad", adding it should make the model sadder.
+
+## Finding a direction with two averages
+
+The simplest way to find a concept direction is a **difference of means**.
+Collect the residual stream at layer $\ell$ for two contrasting sets of text,
+one sad and one happy, average each set, and subtract:
+
+$$
+d_\ell \;=\; \underbrace{\frac{1}{|S|}\sum_{x \in S} \bar h_\ell(x)}_{\text{mean over sad texts}}
+\;-\;
+\underbrace{\frac{1}{|H|}\sum_{x \in H} \bar h_\ell(x)}_{\text{mean over happy texts}}
+$$
+
+where $\bar h_\ell(x)$ is the layer-$\ell$ activation for text $x$, averaged over
+its tokens. Everything the two sets have in common (grammar, topic, "this is
+English") cancels out. What survives is, roughly, *what makes sad text different
+from happy text* at that depth of the network.
+
+In code, with Hugging Face Transformers, `output_hidden_states=True` hands us
+every layer's stream at once:
+
+```python
+import torch
+from transformers import AutoModelForCausalLM, AutoTokenizer
+
+tok = AutoTokenizer.from_pretrained("Qwen/Qwen3-0.6B")
+model = AutoModelForCausalLM.from_pretrained("Qwen/Qwen3-0.6B", dtype=torch.float32)
+
+@torch.no_grad()
+def mean_acts(texts, layer):
+    """Average layer-`layer` activation over tokens, then over texts."""
+    means = []
+    for t in texts:
+        ids = tok(t, return_tensors="pt")
+        hs = model(**ids, output_hidden_states=True).hidden_states  # tuple of (1, T, d)
+        means.append(hs[layer][0].mean(0))                          # average over tokens
+    return torch.stack(means).mean(0)
+
+sad   = ["I miss her every single day.", "Nothing I do seems to matter anymore.", ...]
+happy = ["What a wonderful morning!", "I just got the job, I can't stop smiling.", ...]
+
+layer = 12
+d = mean_acts(sad, layer) - mean_acts(happy, layer)   # shape (1024,)
+```
+
+::: {.callout-note collapse="true"}
+## Which index is "layer 12"?
+
+`hidden_states` has one more entry than there are blocks: index 0 is the token
+embeddings, and index $\ell$ is the output of block $\ell$, which lives at
+`model.model.layers[ℓ - 1]`. So "layer 12" means `hidden_states[12]`, and the
+hook goes on `model.model.layers[11]`. Getting this off by one is the most common
+way to silently steer the wrong layer. We number layers like `hidden_states` (and
+like the answer key) throughout the series.
+:::
+
+We keep $d$ **unnormalised**. Its length is the actual gap between the two
+averages, so a strength of 1 means "shift by one full sad-minus-happy gap", and
+strengths are comparable across layers whose activations have very different sizes.
+(We'll need a unit vector $\hat u = d/\lVert d\rVert$ later, for removal.)
+
+## Pushing with a forward hook
+
+PyTorch lets you register a function that runs after any module's `forward` and,
+if it returns something, **replaces** that module's output. That's all steering needs:
+
+```python
+strength = 1.0
+
+def push(module, inputs, out):
+    # Decoder layers return either a tensor or a tuple whose first item is the hidden state,
+    # depending on the Transformers version. Handle both.
+    if isinstance(out, tuple):
+        return (out[0] + strength * d,) + out[1:]
+    return out + strength * d
+
+handle = model.model.layers[layer - 1].register_forward_hook(push)
+
+prompt = tok.apply_chat_template([{"role": "user", "content": "Tell me how you feel."}],
+                                 tokenize=False, add_generation_prompt=True)
+ids = tok(prompt, return_tensors="pt")
+out = model.generate(**ids, max_new_tokens=60, do_sample=False)
+print(tok.decode(out[0, ids.input_ids.shape[1]:], skip_special_tokens=True))
+
+handle.remove()   # always clean up, or every later call is steered too
+```
+
+Written as maths, the hook does one thing to every token position $t$:
+
+$$
+h_\ell[t] \;\leftarrow\; h_\ell[t] + s\, d_\ell .
+$$
+
+Every block above layer $\ell$ now sees a residual stream that has been nudged
+toward "sad", and writes its own notes on top of that.
+
+::: {.callout-warning collapse="true"}
+## Two hook gotchas worth knowing early
+
+- **Any return value replaces the output.** A "read-only" hook written as a
+  lambda, such as `lambda m, i, o: seen.append(o)`, returns whatever `append` returns.
+  That's `None` here, which is fine, but `lambda m, i, o: cache.setdefault(k, o)`
+  returns the tensor *or a tuple* and silently swaps the block's output.
+  Read-only hooks should end with an explicit `return None`.
+- **`hidden_states` may not show your edit.** In recent Transformers versions,
+  `output_hidden_states=True` records a block's output *before* user forward hooks
+  run, so the push only shows up in later layers. If you want to check a hook
+  worked, read the stream with a second hook registered after the first.
+
+Both of these turned up while building and testing the series' code (Transformers 5.x).
+:::
+
+## Measuring "sad"
+
+"Sounds gloomier to me" isn't a number, so we score each generation with an
+off-the-shelf emotion classifier, `j-hartmann/emotion-english-distilroberta-base`
+[@hartmann2022emotion], and use the same mood score as the answer key:
+
+$$
+\text{mood} = P(\text{joy}) - P(\text{sadness}),
+$$
+
+which runs from $-1$ (all sadness) to $+1$ (all joy).
+
+```python
+from transformers import pipeline
+
+clf = pipeline("text-classification",
+               model="j-hartmann/emotion-english-distilroberta-base", top_k=None)
+
+def mood(text):
+    scores = {r["label"]: r["score"] for r in clf(text)[0]}
+    return scores["joy"] - scores["sadness"]
+```
+
+::: {.key-result}
+**Original repo's results** [@biswas2025steering], layer 12, Qwen3-0.6B: mood
+falls from **0.566** with no push to **0.224** at 1× and **−0.154** at 2×.
+A random direction of the same length leaves it at **0.502**, so the effect
+comes from *this* direction, not from disturbing the stream.
+:::
+
+That last control matters. Adding *any* large vector changes the output somehow;
+a random direction of the same norm is the cheapest way to show the change is
+about sadness and not about damage.
+
+## Pushing the other way: removal
+
+A direction can also be taken *out*. Instead of adding $s\,d$, project the
+stream onto the unit direction $\hat u$ and subtract (some of) that component:
+
+$$
+h \;\leftarrow\; h - \alpha\,(h \cdot \hat u)\,\hat u, \qquad \hat u = \frac{d}{\lVert d\rVert}.
+$$
+
+With $\alpha = 1$ the stream has no component along $\hat u$ at all; the model can
+no longer "write" sadness along that axis at that layer. In code it's one line
+more than the push:
+
+```python
+u = d / d.norm()
+
+def remove(module, inputs, out, alpha=1.0):
+    h = out[0] if isinstance(out, tuple) else out
+    h = h - alpha * (h @ u)[..., None] * u
+    return (h,) + out[1:] if isinstance(out, tuple) else h
+```
+
+::: {.column-margin}
+On a TPU, `h @ u` is a matmul and runs at bf16 input precision by default. That cost us a
+mismatch; see [part 3](../03-torchtpu-first-steps/index.qmd#what-broke-fp32-matmuls-that-arent-quite-fp32)
+and [part 4](../04-one-row-per-experiment/index.qmd).
+:::
+
+Removal is how refusal directions are ablated [@arditi2024refusal], and it gets
+its own search (and its own trap) in parts 2 and 5.
+
+## What's next
+
+Four lines get you a sad model, *if* you pick the right layer and strength.
+Pick layer 2 and nothing happens; pick strength 10 and the model forgets
+how to speak. [Part 2](../02-steering-is-search/index.qmd) shows how narrow that
+window is, and why that makes steering a search problem that is a natural fit
+for one big batch.
+
+## Acknowledgements {.appendix}
+
+The steering recipe, prompts and every "original repo" number in this post come from
+Avishek Biswas's [`learn-mech-interp/03-steering`](https://github.com/avbiswas/learn-mech-interp/tree/main/03-steering)
+(MIT). Code snippets here are simplified for reading; the tested versions live in the
+series' code repository.

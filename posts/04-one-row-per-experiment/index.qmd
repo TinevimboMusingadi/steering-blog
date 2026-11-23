@@ -1,0 +1,192 @@
+---
+title: "One row per experiment"
+subtitle: "Batched steering on a TPU, and proof that it matches the loop"
+description: "Every batch row carries its own direction, layer and strength. On a TPU v5e-1 the batched sweep reproduces the original repo's steering curve and matches one-at-a-time generation row for row, 4.4× faster."
+date: 2026-11-25
+order: 4
+categories: [steering, torchtpu, results]
+image: ../../figures/favicon.svg
+---
+
+```{python}
+#| echo: false
+import os, sys
+sys.path.insert(0, os.environ.get("QUARTO_PROJECT_DIR", "../.."))
+from _lib.plots import load, line, bars, ROLE, PALETTE
+
+loop, bat = load("04-m1-loop.json"), load("04-m1-batched.json")
+m2, m2d, bf = load("04-m2-fp32-strict.json"), load("04-m2-fp32-defer.json"), load("04-m2-bf16-b256-strict.json")
+ref = loop["reference"]
+f2 = lambda x: f"{x:.2f}"
+```
+
+[Part 2](../02-steering-is-search/index.qmd) proposed a hook where every row of the batch
+runs its own steering experiment, and [part 3](../03-torchtpu-first-steps/index.qmd) got
+hooks running on a TPU. This post puts the two together and asks the questions that
+matter before any speed claim:
+
+1. Does the batched version reproduce the original repo's results?
+2. Does it give **the same output, row for row,** as running each setting alone?
+3. Is it actually faster?
+
+Short answers: yes, yes (in fp32: 264 of 264 rows identical), and yes (4.4× on this test,
+about 15× on the big sweep in part 5). We also found a bf16 problem on the way that
+silently corrupted half of a batch, which is the best argument I know for question 2.
+
+All numbers are from one TPU v5e chip, fp32, Qwen3-0.6B.
+
+## From a table of settings to a batch
+
+A sweep starts as a table of settings: direction, layer, strength, removal amount, and
+whether to steer prompt tokens or only generated ones. Each setting is run on a few
+prompts, so each setting becomes a few **rows**:
+
+| setting | direction | layer | strength | prompts | rows |
+|---|---|---|---|---|---|
+| baseline | none | – | 0 | 12 | 0–11 |
+| sad 1× | sad | 12 | 1.0 | 12 | 12–23 |
+| sad 2× | sad | 12 | 2.0 | 12 | 24–35 |
+| random 2× | random (same norm) | 12 | 2.0 | 12 | 36–47 |
+
+The rows are packed into chunks of a **fixed** batch size (the last chunk is padded with
+dummy rows), and each row's settings are written into preallocated device tensors:
+`vec[B, d]`, `strength[B]`, `unit[B, d]`, `ablate[B]`, `layer_mask[B, n_layers]`,
+`prompt_scale[B]`. One hook on every block applies them all:
+
+$$
+h_\ell[b, t] \leftarrow h_\ell[b,t] + m_{b,\ell}\,p_{b,t}\Big(s_b\,v_b - \alpha_b\,(h_\ell[b,t]\cdot\hat u_b)\,\hat u_b\Big)
+$$
+
+where $m_{b,\ell}$ says whether row $b$ edits block $\ell$ and $p_{b,t}$ masks out left
+padding (and, optionally, prompt tokens). The baseline row is just a row with every
+weight at zero.
+
+Generation uses a static KV cache, a fixed `[B, T + N]` attention mask and explicit
+`position_ids` (the prompts are left-padded), so shapes stay the same from the first
+token to the last. Prefill and decode are told apart by sequence length, which is static,
+rather than by a Python flag.
+
+## Q1: does it reproduce the original repo?
+
+The M1 experiment repeats the original repo's layer-12 mood curve: push the sad direction at
+strengths −3× … 4×, generate replies to a set of prompts, score each with the emotion
+classifier, and compare to the reference numbers [@biswas2025steering].
+
+```{python}
+#| label: fig-m1
+#| fig-cap: "Mood (P(joy) − P(sadness)) vs push strength at layer 12, on a TPU v5e-1. Loop = one setting at a time; batched = all settings in one sweep; reference = the original repo's reported numbers."
+xs = sorted(int(k) for k in ref["strength_curve"])
+curve = lambda d: [d["strength_curve"][str(x)] for x in xs]
+fig, ax = line(
+    xs, {"loop (ours, TPU)": curve(loop), "batched (ours, TPU)": curve(bat), "reference (original repo)": curve(ref)},
+    colors={"loop (ours, TPU)": PALETTE["orange"], "batched (ours, TPU)": ROLE["steered"],
+            "reference (original repo)": ROLE["control"]},
+    xlabel="push strength (× sad − happy vector)", ylabel="mood",
+    source="ours: data/04-m1-*.json; reference: avbiswas/learn-mech-interp 03-steering (MIT)",
+)
+ax.axhline(0, color="#8a8f98", lw=0.6)
+ax.set_xticks(xs, [f"{x}×" for x in xs]);
+```
+
+| | no push | 1× | 2× | random dir. (2×) | facts after 2× | KL at 2× |
+|---|---|---|---|---|---|---|
+| Loop (ours) | `{python} f2(loop["strength_curve"]["0"])` | `{python} f2(loop["strength_curve"]["1"])` | `{python} f2(loop["strength_curve"]["2"])` | `{python} f2(loop["controls"]["random direction"])` | `{python} f2(loop["damage_at_2x"]["facts_after"])` | `{python} f"{loop['damage_at_2x']['kl']:.3f}"` |
+| Batched (ours) | `{python} f2(bat["strength_curve"]["0"])` | `{python} f2(bat["strength_curve"]["1"])` | `{python} f2(bat["strength_curve"]["2"])` | `{python} f2(bat["controls"]["random direction"])` | `{python} f2(bat["damage_at_2x"]["facts_after"])` | `{python} f"{bat['damage_at_2x']['kl']:.3f}"` |
+| Original repo | `{python} f2(ref["strength_curve"]["0"])` | `{python} f2(ref["strength_curve"]["1"])` | `{python} f2(ref["strength_curve"]["2"])` | `{python} f2(ref["controls"]["random direction"])` | `{python} f2(ref["damage"]["facts_after"])` | `{python} f"{ref['damage']['kl']:.3f}"` |
+
+: Layer-12 reproduction. "Facts" is the share of simple factual questions still answered correctly (0.85 with no push); KL is the divergence of the steered next-token distribution from the unsteered one. {#tbl-m1}
+
+The shape matches: mood falls from about 0.55 with no push to around zero or below at
+2×, flattens past that, and a random direction of the same length barely moves it. The
+damage numbers at 2× (facts 0.85 → 0.65, KL 0.361 vs 0.358) match the reference almost
+exactly, which is reassuring because KL doesn't depend on sampling.
+
+Why do loop and batched differ by a few hundredths of mood? M1 samples at temperature 0.5,
+and a batch of 396 rows draws its random numbers in a different order from 10 separate small
+batches. Each run is a fair sample, just a different one. To compare the two *exactly*
+we need greedy decoding, which is M2.
+
+## Q2: is it the same, row for row?
+
+M2 runs 11 settings × 24 prompts = 264 rows twice: once one setting at a time (mode A, the
+loop), and once as a single batched sweep. Decoding is greedy, so any difference in the
+generated tokens is a real difference in the computation.
+
+::: {.key-result}
+**fp32 on TPU: `{python} int(m2["match_rate"] * m2["rows"])` of `{python} m2["rows"]` rows
+produce identical greedy text** in both Strict and DeferAndFuse eager modes.
+:::
+
+Getting there took one fix, covered in [part 3](../03-torchtpu-first-steps/index.qmd#what-broke-fp32-matmuls-that-arent-quite-fp32):
+the loop's removal used a matmul, which TPUs run at bf16 input precision by default, while
+the batched hook used an elementwise product. Five rows drifted until both used the same ops.
+
+## Q3: is it faster?
+
+```{python}
+#| label: fig-m2-speed
+#| fig-cap: "Wall-clock time to generate all 264 rows of M2 (11 settings × 24 prompts, 60 new tokens, fp32, TPU v5e-1), after warm-up."
+fig, ax = bars(
+    ["loop (A)", "batched, Strict (B)", "batched, DeferAndFuse (C)"],
+    [m2["loop_s"], m2["batched_s"], m2d["batched_s"]],
+    colors=[ROLE["control"], ROLE["steered"], PALETTE["teal"]], fmt="{:.1f} s", ylabel="seconds",
+    source="data/04-m2-fp32-strict.json, data/04-m2-fp32-defer.json",
+)
+```
+
+Batching cut M2 from `{python} f"{m2['loop_s']:.0f}"` s to `{python} f"{m2['batched_s']:.0f}"` s,
+a **`{python} f"{m2['speedup']:.1f}"`×** speed-up, with exactly the same outputs. DeferAndFuse
+was within noise of Strict (`{python} f"{m2d['batched_s']:.1f}"` s vs `{python} f"{m2['batched_s']:.1f}"` s).
+This test is small (264 rows fit in about one batch), so it understates what batching does
+for a big sweep; part 5 runs 8,064 rows.
+
+## What broke: half a batch of garbage in bf16
+
+Running M2 in **bf16** gave a very different answer: only
+`{python} f"{bf['match_rate']:.0%}"` of rows matched. The mismatches weren't small. Here is
+one row, the same setting and prompt in both runs:
+
+| | sad 2×, "Write two sentences about winter." |
+|---|---|
+| **Loop** | `{python} bf["mismatches"][0]["loop"]` |
+| **Batched, bf16, B = 256** | `{python} bf["mismatches"][0]["batched"]` |
+
+Narrowing it down:
+
+- With bf16 activations, a **steered** batch of **256** rows whose prompts have **different
+  left padding** produces garbage on rows 128–255. Rows 0–127 are exact.
+- All of these are clean: fp32 at batch 256; bf16 at batch 128; unsteered bf16 at 256; and
+  steered bf16 at 256 when every row has the same prompt.
+- Rewriting the hook maths (pure bf16, or add in fp32 and cast back) does **not** fix it.
+
+That points below our code, at the platform, and it's to be reported upstream (repro scripts in the lab repo). The workaround is to cap bf16 TPU batches at 128 rows; fp32 is unaffected.
+
+The cost of not checking would have been real: the first big sweep (part 5) ran in bf16 at
+batch 256, and half of its rows were corrupted. Nothing crashed, and the summary numbers
+looked plausible. It was rerun in fp32.
+
+::: {.callout-tip}
+## The lesson
+Always check **batched == loop on the target hardware and dtype** before trusting a
+batched result. CPU tests passed; fp32 on TPU passed; bf16 on TPU did not.
+:::
+
+## Other things that broke
+
+From the lab log, smaller but worth knowing if you build something similar with
+Transformers 5.x:
+
+- `output_hidden_states=True` records block outputs *before* forward hooks run, so it
+  doesn't show your push. Check edits with a read hook registered after the steering hook.
+- A "read-only" hook that returns anything replaces the block's output.
+- Two steering objects on one model: an idle object's hooks fired during the other's run and
+  crashed on a batch-size mismatch. Hooks should be enabled only inside their own calls.
+
+[Part 5](../05-results-maps/index.qmd) uses all this to map the whole steering window,
+every layer at once.
+
+## Acknowledgements {.appendix}
+
+Reference numbers, prompts and the steering recipe: Avishek Biswas,
+[`learn-mech-interp/03-steering`](https://github.com/avbiswas/learn-mech-interp/tree/main/03-steering) (MIT).
+Our numbers are from `data/04-*.json`, copied from the experiment runs.

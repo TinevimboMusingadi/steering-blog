@@ -1,0 +1,23 @@
+{
+  "_placeholder": false,
+  "_note": "Numbers reported by the ORIGINAL repo (avbiswas/learn-mech-interp, 03-steering, MIT), not measured by this project. Quoted for comparison only.",
+  "source": "avbiswas/learn-mech-interp 03-steering (MIT)",
+  "model": "Qwen/Qwen3-0.6B",
+  "mood": {
+    "metric": "P(joy) - P(sadness), classifier j-hartmann/emotion-english-distilroberta-base",
+    "layer": 12,
+    "multipliers": [0, 1, 2],
+    "sad_push": [0.566, 0.224, -0.154],
+    "random_direction_control": 0.502
+  },
+  "tomato": {
+    "best_layer": 18,
+    "multiplier": 10,
+    "success_rate": 0.44
+  },
+  "removal_search": {
+    "trials": 40,
+    "best_tune_score": 0.868,
+    "same_config_test_score": 0.822
+  }
+}

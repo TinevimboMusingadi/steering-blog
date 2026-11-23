@@ -1,0 +1,11 @@
+# Shared front matter for every post in the series.
+author:
+  - name:
+      literal: Tinevimbo
+    affiliation: TPU Builder, Zimbabwe
+    url: https://github.com/TinevimboMusingadi
+citation: true
+google-scholar: true
+license: "CC BY"
+comments: false
+title-block-categories: true
