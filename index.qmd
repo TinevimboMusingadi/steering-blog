@@ -30,4 +30,4 @@ reproduce come from Avishek Biswas's
 [`learn-mech-interp/03-steering`](https://github.com/avbiswas/learn-mech-interp/tree/main/03-steering)
 (MIT), which serves as the answer key throughout.
 
-**Read in order.** Parts 1–3 need no TPU; parts 4–6 report the TPU results.
+**Read in order.** Parts 1–3 need no TPU; parts 4–6 report the TPU results; part 7 adds the stretch experiments (refusal, mixing two directions).

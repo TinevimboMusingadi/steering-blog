@@ -1,0 +1,56 @@
+{
+ "what": "TPU v5e-1, fp32, greedy, Qwen3-0.6B, 6 test topics x 5 configs, 40 new tokens (scripts/check_mix_compile.py)",
+ "mix_batched_equals_loop": [
+  29,
+  30
+ ],
+ "compile_equals_eager": [
+  24,
+  30
+ ],
+ "differences": [
+  {
+   "what": "mix",
+   "config": "sad L17 x1.5 + tomato L17-18 x12.3",
+   "same_chars": 104,
+   "of_chars": 110
+  },
+  {
+   "what": "compile",
+   "config": "sad L12 x2 + tomato L18 x10",
+   "same_chars": 74,
+   "of_chars": 135
+  },
+  {
+   "what": "compile",
+   "config": "sad L12 x2 + tomato L18 x10",
+   "same_chars": 13,
+   "of_chars": 90
+  },
+  {
+   "what": "compile",
+   "config": "sad L17 x1.5 + tomato L17-18 x12.3",
+   "same_chars": 37,
+   "of_chars": 155
+  },
+  {
+   "what": "compile",
+   "config": "sad L12 x2 + remove",
+   "same_chars": 71,
+   "of_chars": 109
+  },
+  {
+   "what": "compile",
+   "config": "induce refusal L20 x2",
+   "same_chars": 95,
+   "of_chars": 197
+  },
+  {
+   "what": "compile",
+   "config": "induce refusal L20 x2",
+   "same_chars": 5,
+   "of_chars": 102
+  }
+ ],
+ "log": "logs/check_mix_compile.log"
+}

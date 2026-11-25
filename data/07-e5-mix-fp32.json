@@ -1,0 +1,1014 @@
+{
+ "env": {
+  "torch": "2.15.0+cpu",
+  "transformers": "5.24.1",
+  "python": "3.12.16",
+  "defer_and_fuse_env": "",
+  "torch_tpu": "?"
+ },
+ "saved_at": "2026-11-25 06:39:18",
+ "args": {
+  "device": null,
+  "model": "Qwen/Qwen3-0.6B",
+  "dtype": "float32",
+  "eager": "strict",
+  "temperature": 0.5,
+  "tokens": 50,
+  "batch": 256,
+  "topics": 0,
+  "seed": 0,
+  "tag": "",
+  "tiny": false,
+  "sad": "0,0.5,1,1.5,2",
+  "tomato": "0,5,10,12.3,15"
+ },
+ "cos_sad_tomato": [
+  -0.0022,
+  0.0391,
+  0.0219,
+  -0.0723,
+  -0.0543,
+  -0.0429,
+  -0.0163,
+  0.0353,
+  0.0066,
+  0.0051,
+  -0.0007,
+  -0.0226,
+  0.0169,
+  0.0383,
+  0.0385,
+  0.0069,
+  -0.021,
+  0.0665,
+  0.0363,
+  -0.0189,
+  0.0064,
+  -0.002,
+  -0.0249,
+  -0.0477,
+  -0.0436,
+  -0.062,
+  -0.0426,
+  -0.1029,
+  -0.0986
+ ],
+ "choose": {
+  "grid": [
+   {
+    "pair": "sad L12 + tomato L18",
+    "sad": 0.0,
+    "tomato": 0.0,
+    "mood": 0.5257,
+    "tomato_success": 0.0,
+    "mood_interaction": 0.0,
+    "tomato_success_interaction": 0.0
+   },
+   {
+    "pair": "sad L12 + tomato L18",
+    "sad": 0.0,
+    "tomato": 5.0,
+    "mood": 0.647,
+    "tomato_success": 0.0,
+    "mood_interaction": 0.0,
+    "tomato_success_interaction": 0.0
+   },
+   {
+    "pair": "sad L12 + tomato L18",
+    "sad": 0.0,
+    "tomato": 10.0,
+    "mood": 0.538,
+    "tomato_success": 0.4444,
+    "mood_interaction": 0.0,
+    "tomato_success_interaction": 0.0
+   },
+   {
+    "pair": "sad L12 + tomato L18",
+    "sad": 0.0,
+    "tomato": 12.3,
+    "mood": 0.45,
+    "tomato_success": 0.3889,
+    "mood_interaction": -0.0,
+    "tomato_success_interaction": 0.0
+   },
+   {
+    "pair": "sad L12 + tomato L18",
+    "sad": 0.0,
+    "tomato": 15.0,
+    "mood": 0.2321,
+    "tomato_success": 0.2222,
+    "mood_interaction": 0.0,
+    "tomato_success_interaction": 0.0
+   },
+   {
+    "pair": "sad L12 + tomato L18",
+    "sad": 0.5,
+    "tomato": 0.0,
+    "mood": 0.3581,
+    "tomato_success": 0.0,
+    "mood_interaction": 0.0,
+    "tomato_success_interaction": 0.0
+   },
+   {
+    "pair": "sad L12 + tomato L18",
+    "sad": 0.5,
+    "tomato": 5.0,
+    "mood": 0.4488,
+    "tomato_success": 0.0,
+    "mood_interaction": -0.0306,
+    "tomato_success_interaction": 0.0
+   },
+   {
+    "pair": "sad L12 + tomato L18",
+    "sad": 0.5,
+    "tomato": 10.0,
+    "mood": 0.3761,
+    "tomato_success": 0.3889,
+    "mood_interaction": 0.0057,
+    "tomato_success_interaction": -0.0555
+   },
+   {
+    "pair": "sad L12 + tomato L18",
+    "sad": 0.5,
+    "tomato": 12.3,
+    "mood": 0.4154,
+    "tomato_success": 0.4167,
+    "mood_interaction": 0.133,
+    "tomato_success_interaction": 0.0278
+   },
+   {
+    "pair": "sad L12 + tomato L18",
+    "sad": 0.5,
+    "tomato": 15.0,
+    "mood": 0.3266,
+    "tomato_success": 0.2778,
+    "mood_interaction": 0.2621,
+    "tomato_success_interaction": 0.0556
+   },
+   {
+    "pair": "sad L12 + tomato L18",
+    "sad": 1.0,
+    "tomato": 0.0,
+    "mood": 0.0837,
+    "tomato_success": 0.0,
+    "mood_interaction": 0.0,
+    "tomato_success_interaction": 0.0
+   },
+   {
+    "pair": "sad L12 + tomato L18",
+    "sad": 1.0,
+    "tomato": 5.0,
+    "mood": 0.1339,
+    "tomato_success": 0.0,
+    "mood_interaction": -0.0711,
+    "tomato_success_interaction": 0.0
+   },
+   {
+    "pair": "sad L12 + tomato L18",
+    "sad": 1.0,
+    "tomato": 10.0,
+    "mood": 0.3032,
+    "tomato_success": 0.2222,
+    "mood_interaction": 0.2072,
+    "tomato_success_interaction": -0.2222
+   },
+   {
+    "pair": "sad L12 + tomato L18",
+    "sad": 1.0,
+    "tomato": 12.3,
+    "mood": 0.3085,
+    "tomato_success": 0.4444,
+    "mood_interaction": 0.3005,
+    "tomato_success_interaction": 0.0555
+   },
+   {
+    "pair": "sad L12 + tomato L18",
+    "sad": 1.0,
+    "tomato": 15.0,
+    "mood": 0.2148,
+    "tomato_success": 0.4167,
+    "mood_interaction": 0.4247,
+    "tomato_success_interaction": 0.1945
+   },
+   {
+    "pair": "sad L12 + tomato L18",
+    "sad": 1.5,
+    "tomato": 0.0,
+    "mood": -0.0641,
+    "tomato_success": 0.0,
+    "mood_interaction": -0.0,
+    "tomato_success_interaction": 0.0
+   },
+   {
+    "pair": "sad L12 + tomato L18",
+    "sad": 1.5,
+    "tomato": 5.0,
+    "mood": 0.1136,
+    "tomato_success": 0.0,
+    "mood_interaction": 0.0564,
+    "tomato_success_interaction": 0.0
+   },
+   {
+    "pair": "sad L12 + tomato L18",
+    "sad": 1.5,
+    "tomato": 10.0,
+    "mood": 0.2409,
+    "tomato_success": 0.4444,
+    "mood_interaction": 0.2927,
+    "tomato_success_interaction": 0.0
+   },
+   {
+    "pair": "sad L12 + tomato L18",
+    "sad": 1.5,
+    "tomato": 12.3,
+    "mood": 0.2412,
+    "tomato_success": 0.3611,
+    "mood_interaction": 0.381,
+    "tomato_success_interaction": -0.0278
+   },
+   {
+    "pair": "sad L12 + tomato L18",
+    "sad": 1.5,
+    "tomato": 15.0,
+    "mood": 0.1892,
+    "tomato_success": 0.3333,
+    "mood_interaction": 0.5469,
+    "tomato_success_interaction": 0.1111
+   },
+   {
+    "pair": "sad L12 + tomato L18",
+    "sad": 2.0,
+    "tomato": 0.0,
+    "mood": -0.1907,
+    "tomato_success": 0.0,
+    "mood_interaction": -0.0,
+    "tomato_success_interaction": 0.0
+   },
+   {
+    "pair": "sad L12 + tomato L18",
+    "sad": 2.0,
+    "tomato": 5.0,
+    "mood": 0.114,
+    "tomato_success": 0.0833,
+    "mood_interaction": 0.1834,
+    "tomato_success_interaction": 0.0833
+   },
+   {
+    "pair": "sad L12 + tomato L18",
+    "sad": 2.0,
+    "tomato": 10.0,
+    "mood": 0.1488,
+    "tomato_success": 0.3889,
+    "mood_interaction": 0.3272,
+    "tomato_success_interaction": -0.0555
+   },
+   {
+    "pair": "sad L12 + tomato L18",
+    "sad": 2.0,
+    "tomato": 12.3,
+    "mood": 0.2294,
+    "tomato_success": 0.3889,
+    "mood_interaction": 0.4958,
+    "tomato_success_interaction": 0.0
+   },
+   {
+    "pair": "sad L12 + tomato L18",
+    "sad": 2.0,
+    "tomato": 15.0,
+    "mood": 0.1013,
+    "tomato_success": 0.1944,
+    "mood_interaction": 0.5856,
+    "tomato_success_interaction": -0.0278
+   },
+   {
+    "pair": "sad L17 + tomato L17 spread 2",
+    "sad": 0.0,
+    "tomato": 0.0,
+    "mood": 0.5738,
+    "tomato_success": 0.0,
+    "mood_interaction": 0.0,
+    "tomato_success_interaction": 0.0
+   },
+   {
+    "pair": "sad L17 + tomato L17 spread 2",
+    "sad": 0.0,
+    "tomato": 5.0,
+    "mood": 0.6259,
+    "tomato_success": 0.0278,
+    "mood_interaction": 0.0,
+    "tomato_success_interaction": 0.0
+   },
+   {
+    "pair": "sad L17 + tomato L17 spread 2",
+    "sad": 0.0,
+    "tomato": 10.0,
+    "mood": 0.6784,
+    "tomato_success": 0.3056,
+    "mood_interaction": 0.0,
+    "tomato_success_interaction": 0.0
+   },
+   {
+    "pair": "sad L17 + tomato L17 spread 2",
+    "sad": 0.0,
+    "tomato": 12.3,
+    "mood": 0.6095,
+    "tomato_success": 0.3611,
+    "mood_interaction": 0.0,
+    "tomato_success_interaction": 0.0
+   },
+   {
+    "pair": "sad L17 + tomato L17 spread 2",
+    "sad": 0.0,
+    "tomato": 15.0,
+    "mood": 0.4833,
+    "tomato_success": 0.1944,
+    "mood_interaction": 0.0,
+    "tomato_success_interaction": 0.0
+   },
+   {
+    "pair": "sad L17 + tomato L17 spread 2",
+    "sad": 0.5,
+    "tomato": 0.0,
+    "mood": 0.366,
+    "tomato_success": 0.0,
+    "mood_interaction": 0.0,
+    "tomato_success_interaction": 0.0
+   },
+   {
+    "pair": "sad L17 + tomato L17 spread 2",
+    "sad": 0.5,
+    "tomato": 5.0,
+    "mood": 0.3893,
+    "tomato_success": 0.0,
+    "mood_interaction": -0.0288,
+    "tomato_success_interaction": -0.0278
+   },
+   {
+    "pair": "sad L17 + tomato L17 spread 2",
+    "sad": 0.5,
+    "tomato": 10.0,
+    "mood": 0.4759,
+    "tomato_success": 0.4167,
+    "mood_interaction": 0.0053,
+    "tomato_success_interaction": 0.1111
+   },
+   {
+    "pair": "sad L17 + tomato L17 spread 2",
+    "sad": 0.5,
+    "tomato": 12.3,
+    "mood": 0.5422,
+    "tomato_success": 0.5278,
+    "mood_interaction": 0.1405,
+    "tomato_success_interaction": 0.1667
+   },
+   {
+    "pair": "sad L17 + tomato L17 spread 2",
+    "sad": 0.5,
+    "tomato": 15.0,
+    "mood": 0.3899,
+    "tomato_success": 0.3611,
+    "mood_interaction": 0.1144,
+    "tomato_success_interaction": 0.1667
+   },
+   {
+    "pair": "sad L17 + tomato L17 spread 2",
+    "sad": 1.0,
+    "tomato": 0.0,
+    "mood": 0.0951,
+    "tomato_success": 0.0,
+    "mood_interaction": 0.0,
+    "tomato_success_interaction": 0.0
+   },
+   {
+    "pair": "sad L17 + tomato L17 spread 2",
+    "sad": 1.0,
+    "tomato": 5.0,
+    "mood": 0.2883,
+    "tomato_success": 0.0278,
+    "mood_interaction": 0.1411,
+    "tomato_success_interaction": 0.0
+   },
+   {
+    "pair": "sad L17 + tomato L17 spread 2",
+    "sad": 1.0,
+    "tomato": 10.0,
+    "mood": 0.3219,
+    "tomato_success": 0.4722,
+    "mood_interaction": 0.1222,
+    "tomato_success_interaction": 0.1666
+   },
+   {
+    "pair": "sad L17 + tomato L17 spread 2",
+    "sad": 1.0,
+    "tomato": 12.3,
+    "mood": 0.331,
+    "tomato_success": 0.4722,
+    "mood_interaction": 0.2002,
+    "tomato_success_interaction": 0.1111
+   },
+   {
+    "pair": "sad L17 + tomato L17 spread 2",
+    "sad": 1.0,
+    "tomato": 15.0,
+    "mood": 0.2561,
+    "tomato_success": 0.3056,
+    "mood_interaction": 0.2515,
+    "tomato_success_interaction": 0.1112
+   },
+   {
+    "pair": "sad L17 + tomato L17 spread 2",
+    "sad": 1.5,
+    "tomato": 0.0,
+    "mood": -0.1629,
+    "tomato_success": 0.0,
+    "mood_interaction": 0.0,
+    "tomato_success_interaction": 0.0
+   },
+   {
+    "pair": "sad L17 + tomato L17 spread 2",
+    "sad": 1.5,
+    "tomato": 5.0,
+    "mood": -0.081,
+    "tomato_success": 0.0,
+    "mood_interaction": 0.0298,
+    "tomato_success_interaction": -0.0278
+   },
+   {
+    "pair": "sad L17 + tomato L17 spread 2",
+    "sad": 1.5,
+    "tomato": 10.0,
+    "mood": 0.0943,
+    "tomato_success": 0.3889,
+    "mood_interaction": 0.1526,
+    "tomato_success_interaction": 0.0833
+   },
+   {
+    "pair": "sad L17 + tomato L17 spread 2",
+    "sad": 1.5,
+    "tomato": 12.3,
+    "mood": 0.1364,
+    "tomato_success": 0.3056,
+    "mood_interaction": 0.2636,
+    "tomato_success_interaction": -0.0555
+   },
+   {
+    "pair": "sad L17 + tomato L17 spread 2",
+    "sad": 1.5,
+    "tomato": 15.0,
+    "mood": 0.1004,
+    "tomato_success": 0.4167,
+    "mood_interaction": 0.3538,
+    "tomato_success_interaction": 0.2223
+   },
+   {
+    "pair": "sad L17 + tomato L17 spread 2",
+    "sad": 2.0,
+    "tomato": 0.0,
+    "mood": -0.0782,
+    "tomato_success": 0.0,
+    "mood_interaction": -0.0,
+    "tomato_success_interaction": 0.0
+   },
+   {
+    "pair": "sad L17 + tomato L17 spread 2",
+    "sad": 2.0,
+    "tomato": 5.0,
+    "mood": -0.1841,
+    "tomato_success": 0.0278,
+    "mood_interaction": -0.158,
+    "tomato_success_interaction": 0.0
+   },
+   {
+    "pair": "sad L17 + tomato L17 spread 2",
+    "sad": 2.0,
+    "tomato": 10.0,
+    "mood": -0.0606,
+    "tomato_success": 0.3611,
+    "mood_interaction": -0.087,
+    "tomato_success_interaction": 0.0555
+   },
+   {
+    "pair": "sad L17 + tomato L17 spread 2",
+    "sad": 2.0,
+    "tomato": 12.3,
+    "mood": 0.0741,
+    "tomato_success": 0.4722,
+    "mood_interaction": 0.1166,
+    "tomato_success_interaction": 0.1111
+   },
+   {
+    "pair": "sad L17 + tomato L17 spread 2",
+    "sad": 2.0,
+    "tomato": 15.0,
+    "mood": 0.052,
+    "tomato_success": 0.4167,
+    "mood_interaction": 0.2207,
+    "tomato_success_interaction": 0.2223
+   }
+  ],
+  "sanity": [
+   {
+    "sanity": "push",
+    "mood": -0.1275,
+    "tomato_success": 0.0
+   },
+   {
+    "sanity": "remove",
+    "mood": 0.4846,
+    "tomato_success": 0.0
+   },
+   {
+    "sanity": "push+remove at L12",
+    "mood": 0.5548,
+    "tomato_success": 0.0
+   }
+  ]
+ },
+ "test": {
+  "grid": [
+   {
+    "pair": "sad L12 + tomato L18",
+    "sad": 0.0,
+    "tomato": 0.0,
+    "mood": 0.5519,
+    "tomato_success": 0.0,
+    "mood_interaction": 0.0,
+    "tomato_success_interaction": 0.0
+   },
+   {
+    "pair": "sad L12 + tomato L18",
+    "sad": 0.0,
+    "tomato": 5.0,
+    "mood": 0.673,
+    "tomato_success": 0.0417,
+    "mood_interaction": 0.0,
+    "tomato_success_interaction": 0.0
+   },
+   {
+    "pair": "sad L12 + tomato L18",
+    "sad": 0.0,
+    "tomato": 10.0,
+    "mood": 0.5325,
+    "tomato_success": 0.5,
+    "mood_interaction": -0.0,
+    "tomato_success_interaction": 0.0
+   },
+   {
+    "pair": "sad L12 + tomato L18",
+    "sad": 0.0,
+    "tomato": 12.3,
+    "mood": 0.4981,
+    "tomato_success": 0.4167,
+    "mood_interaction": 0.0,
+    "tomato_success_interaction": 0.0
+   },
+   {
+    "pair": "sad L12 + tomato L18",
+    "sad": 0.0,
+    "tomato": 15.0,
+    "mood": 0.2527,
+    "tomato_success": 0.2917,
+    "mood_interaction": -0.0,
+    "tomato_success_interaction": 0.0
+   },
+   {
+    "pair": "sad L12 + tomato L18",
+    "sad": 0.5,
+    "tomato": 0.0,
+    "mood": 0.378,
+    "tomato_success": 0.0,
+    "mood_interaction": 0.0,
+    "tomato_success_interaction": 0.0
+   },
+   {
+    "pair": "sad L12 + tomato L18",
+    "sad": 0.5,
+    "tomato": 5.0,
+    "mood": 0.5027,
+    "tomato_success": 0.0,
+    "mood_interaction": 0.0036,
+    "tomato_success_interaction": -0.0417
+   },
+   {
+    "pair": "sad L12 + tomato L18",
+    "sad": 0.5,
+    "tomato": 10.0,
+    "mood": 0.4952,
+    "tomato_success": 0.5,
+    "mood_interaction": 0.1366,
+    "tomato_success_interaction": 0.0
+   },
+   {
+    "pair": "sad L12 + tomato L18",
+    "sad": 0.5,
+    "tomato": 12.3,
+    "mood": 0.3398,
+    "tomato_success": 0.4167,
+    "mood_interaction": 0.0156,
+    "tomato_success_interaction": 0.0
+   },
+   {
+    "pair": "sad L12 + tomato L18",
+    "sad": 0.5,
+    "tomato": 15.0,
+    "mood": 0.2878,
+    "tomato_success": 0.2083,
+    "mood_interaction": 0.209,
+    "tomato_success_interaction": -0.0834
+   },
+   {
+    "pair": "sad L12 + tomato L18",
+    "sad": 1.0,
+    "tomato": 0.0,
+    "mood": 0.1248,
+    "tomato_success": 0.0,
+    "mood_interaction": -0.0,
+    "tomato_success_interaction": 0.0
+   },
+   {
+    "pair": "sad L12 + tomato L18",
+    "sad": 1.0,
+    "tomato": 5.0,
+    "mood": 0.3725,
+    "tomato_success": 0.0417,
+    "mood_interaction": 0.1266,
+    "tomato_success_interaction": 0.0
+   },
+   {
+    "pair": "sad L12 + tomato L18",
+    "sad": 1.0,
+    "tomato": 10.0,
+    "mood": 0.2657,
+    "tomato_success": 0.4583,
+    "mood_interaction": 0.1603,
+    "tomato_success_interaction": -0.0417
+   },
+   {
+    "pair": "sad L12 + tomato L18",
+    "sad": 1.0,
+    "tomato": 12.3,
+    "mood": 0.2207,
+    "tomato_success": 0.3333,
+    "mood_interaction": 0.1497,
+    "tomato_success_interaction": -0.0834
+   },
+   {
+    "pair": "sad L12 + tomato L18",
+    "sad": 1.0,
+    "tomato": 15.0,
+    "mood": 0.277,
+    "tomato_success": 0.1667,
+    "mood_interaction": 0.4514,
+    "tomato_success_interaction": -0.125
+   },
+   {
+    "pair": "sad L12 + tomato L18",
+    "sad": 1.5,
+    "tomato": 0.0,
+    "mood": -0.0482,
+    "tomato_success": 0.0,
+    "mood_interaction": 0.0,
+    "tomato_success_interaction": 0.0
+   },
+   {
+    "pair": "sad L12 + tomato L18",
+    "sad": 1.5,
+    "tomato": 5.0,
+    "mood": 0.0458,
+    "tomato_success": 0.0,
+    "mood_interaction": -0.0271,
+    "tomato_success_interaction": -0.0417
+   },
+   {
+    "pair": "sad L12 + tomato L18",
+    "sad": 1.5,
+    "tomato": 10.0,
+    "mood": 0.2542,
+    "tomato_success": 0.5,
+    "mood_interaction": 0.3218,
+    "tomato_success_interaction": 0.0
+   },
+   {
+    "pair": "sad L12 + tomato L18",
+    "sad": 1.5,
+    "tomato": 12.3,
+    "mood": 0.2103,
+    "tomato_success": 0.5,
+    "mood_interaction": 0.3123,
+    "tomato_success_interaction": 0.0833
+   },
+   {
+    "pair": "sad L12 + tomato L18",
+    "sad": 1.5,
+    "tomato": 15.0,
+    "mood": 0.0974,
+    "tomato_success": 0.2083,
+    "mood_interaction": 0.4448,
+    "tomato_success_interaction": -0.0834
+   },
+   {
+    "pair": "sad L12 + tomato L18",
+    "sad": 2.0,
+    "tomato": 0.0,
+    "mood": -0.1621,
+    "tomato_success": 0.0,
+    "mood_interaction": 0.0,
+    "tomato_success_interaction": 0.0
+   },
+   {
+    "pair": "sad L12 + tomato L18",
+    "sad": 2.0,
+    "tomato": 5.0,
+    "mood": -0.0408,
+    "tomato_success": 0.0,
+    "mood_interaction": 0.0002,
+    "tomato_success_interaction": -0.0417
+   },
+   {
+    "pair": "sad L12 + tomato L18",
+    "sad": 2.0,
+    "tomato": 10.0,
+    "mood": 0.2739,
+    "tomato_success": 0.4583,
+    "mood_interaction": 0.4554,
+    "tomato_success_interaction": -0.0417
+   },
+   {
+    "pair": "sad L12 + tomato L18",
+    "sad": 2.0,
+    "tomato": 12.3,
+    "mood": 0.2249,
+    "tomato_success": 0.4167,
+    "mood_interaction": 0.4408,
+    "tomato_success_interaction": 0.0
+   },
+   {
+    "pair": "sad L12 + tomato L18",
+    "sad": 2.0,
+    "tomato": 15.0,
+    "mood": 0.1311,
+    "tomato_success": 0.2083,
+    "mood_interaction": 0.5924,
+    "tomato_success_interaction": -0.0834
+   },
+   {
+    "pair": "sad L17 + tomato L17 spread 2",
+    "sad": 0.0,
+    "tomato": 0.0,
+    "mood": 0.5649,
+    "tomato_success": 0.0,
+    "mood_interaction": 0.0,
+    "tomato_success_interaction": 0.0
+   },
+   {
+    "pair": "sad L17 + tomato L17 spread 2",
+    "sad": 0.0,
+    "tomato": 5.0,
+    "mood": 0.6717,
+    "tomato_success": 0.0,
+    "mood_interaction": 0.0,
+    "tomato_success_interaction": 0.0
+   },
+   {
+    "pair": "sad L17 + tomato L17 spread 2",
+    "sad": 0.0,
+    "tomato": 10.0,
+    "mood": 0.6414,
+    "tomato_success": 0.2917,
+    "mood_interaction": 0.0,
+    "tomato_success_interaction": 0.0
+   },
+   {
+    "pair": "sad L17 + tomato L17 spread 2",
+    "sad": 0.0,
+    "tomato": 12.3,
+    "mood": 0.5069,
+    "tomato_success": 0.25,
+    "mood_interaction": -0.0,
+    "tomato_success_interaction": 0.0
+   },
+   {
+    "pair": "sad L17 + tomato L17 spread 2",
+    "sad": 0.0,
+    "tomato": 15.0,
+    "mood": 0.3084,
+    "tomato_success": 0.2917,
+    "mood_interaction": 0.0,
+    "tomato_success_interaction": 0.0
+   },
+   {
+    "pair": "sad L17 + tomato L17 spread 2",
+    "sad": 0.5,
+    "tomato": 0.0,
+    "mood": 0.3724,
+    "tomato_success": 0.0,
+    "mood_interaction": -0.0,
+    "tomato_success_interaction": 0.0
+   },
+   {
+    "pair": "sad L17 + tomato L17 spread 2",
+    "sad": 0.5,
+    "tomato": 5.0,
+    "mood": 0.4319,
+    "tomato_success": 0.0,
+    "mood_interaction": -0.0473,
+    "tomato_success_interaction": 0.0
+   },
+   {
+    "pair": "sad L17 + tomato L17 spread 2",
+    "sad": 0.5,
+    "tomato": 10.0,
+    "mood": 0.4241,
+    "tomato_success": 0.2917,
+    "mood_interaction": -0.0248,
+    "tomato_success_interaction": 0.0
+   },
+   {
+    "pair": "sad L17 + tomato L17 spread 2",
+    "sad": 0.5,
+    "tomato": 12.3,
+    "mood": 0.511,
+    "tomato_success": 0.4583,
+    "mood_interaction": 0.1966,
+    "tomato_success_interaction": 0.2083
+   },
+   {
+    "pair": "sad L17 + tomato L17 spread 2",
+    "sad": 0.5,
+    "tomato": 15.0,
+    "mood": 0.3413,
+    "tomato_success": 0.375,
+    "mood_interaction": 0.2254,
+    "tomato_success_interaction": 0.0833
+   },
+   {
+    "pair": "sad L17 + tomato L17 spread 2",
+    "sad": 1.0,
+    "tomato": 0.0,
+    "mood": 0.0858,
+    "tomato_success": 0.0,
+    "mood_interaction": 0.0,
+    "tomato_success_interaction": 0.0
+   },
+   {
+    "pair": "sad L17 + tomato L17 spread 2",
+    "sad": 1.0,
+    "tomato": 5.0,
+    "mood": 0.2241,
+    "tomato_success": 0.0,
+    "mood_interaction": 0.0315,
+    "tomato_success_interaction": 0.0
+   },
+   {
+    "pair": "sad L17 + tomato L17 spread 2",
+    "sad": 1.0,
+    "tomato": 10.0,
+    "mood": 0.2871,
+    "tomato_success": 0.375,
+    "mood_interaction": 0.1248,
+    "tomato_success_interaction": 0.0833
+   },
+   {
+    "pair": "sad L17 + tomato L17 spread 2",
+    "sad": 1.0,
+    "tomato": 12.3,
+    "mood": 0.3002,
+    "tomato_success": 0.4583,
+    "mood_interaction": 0.2724,
+    "tomato_success_interaction": 0.2083
+   },
+   {
+    "pair": "sad L17 + tomato L17 spread 2",
+    "sad": 1.0,
+    "tomato": 15.0,
+    "mood": 0.2494,
+    "tomato_success": 0.4167,
+    "mood_interaction": 0.4201,
+    "tomato_success_interaction": 0.125
+   },
+   {
+    "pair": "sad L17 + tomato L17 spread 2",
+    "sad": 1.5,
+    "tomato": 0.0,
+    "mood": -0.1435,
+    "tomato_success": 0.0,
+    "mood_interaction": -0.0,
+    "tomato_success_interaction": 0.0
+   },
+   {
+    "pair": "sad L17 + tomato L17 spread 2",
+    "sad": 1.5,
+    "tomato": 5.0,
+    "mood": 0.0612,
+    "tomato_success": 0.0,
+    "mood_interaction": 0.0979,
+    "tomato_success_interaction": 0.0
+   },
+   {
+    "pair": "sad L17 + tomato L17 spread 2",
+    "sad": 1.5,
+    "tomato": 10.0,
+    "mood": 0.1959,
+    "tomato_success": 0.375,
+    "mood_interaction": 0.2629,
+    "tomato_success_interaction": 0.0833
+   },
+   {
+    "pair": "sad L17 + tomato L17 spread 2",
+    "sad": 1.5,
+    "tomato": 12.3,
+    "mood": 0.1504,
+    "tomato_success": 0.4583,
+    "mood_interaction": 0.3519,
+    "tomato_success_interaction": 0.2083
+   },
+   {
+    "pair": "sad L17 + tomato L17 spread 2",
+    "sad": 1.5,
+    "tomato": 15.0,
+    "mood": 0.0939,
+    "tomato_success": 0.4167,
+    "mood_interaction": 0.4939,
+    "tomato_success_interaction": 0.125
+   },
+   {
+    "pair": "sad L17 + tomato L17 spread 2",
+    "sad": 2.0,
+    "tomato": 0.0,
+    "mood": -0.2115,
+    "tomato_success": 0.0,
+    "mood_interaction": 0.0,
+    "tomato_success_interaction": 0.0
+   },
+   {
+    "pair": "sad L17 + tomato L17 spread 2",
+    "sad": 2.0,
+    "tomato": 5.0,
+    "mood": -0.188,
+    "tomato_success": 0.0,
+    "mood_interaction": -0.0833,
+    "tomato_success_interaction": 0.0
+   },
+   {
+    "pair": "sad L17 + tomato L17 spread 2",
+    "sad": 2.0,
+    "tomato": 10.0,
+    "mood": -0.0588,
+    "tomato_success": 0.3333,
+    "mood_interaction": 0.0762,
+    "tomato_success_interaction": 0.0416
+   },
+   {
+    "pair": "sad L17 + tomato L17 spread 2",
+    "sad": 2.0,
+    "tomato": 12.3,
+    "mood": 0.059,
+    "tomato_success": 0.25,
+    "mood_interaction": 0.3285,
+    "tomato_success_interaction": 0.0
+   },
+   {
+    "pair": "sad L17 + tomato L17 spread 2",
+    "sad": 2.0,
+    "tomato": 15.0,
+    "mood": 0.0539,
+    "tomato_success": 0.375,
+    "mood_interaction": 0.5219,
+    "tomato_success_interaction": 0.0833
+   }
+  ],
+  "sanity": [
+   {
+    "sanity": "push",
+    "mood": -0.1734,
+    "tomato_success": 0.0
+   },
+   {
+    "sanity": "remove",
+    "mood": 0.4429,
+    "tomato_success": 0.0
+   },
+   {
+    "sanity": "push+remove at L12",
+    "mood": 0.5653,
+    "tomato_success": 0.0
+   }
+  ]
+ },
+ "timing": {
+  "choose": {
+   "configs": 53,
+   "rows": 1908,
+   "generate_s": 51.8237,
+   "score_s": 22.6869,
+   "configs_per_s": 1.0227
+  },
+  "test": {
+   "configs": 53,
+   "rows": 1272,
+   "generate_s": 30.5235,
+   "score_s": 13.4452,
+   "configs_per_s": 1.7364
+  }
+ }
+}

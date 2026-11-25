@@ -1,0 +1,83 @@
+{
+ "env": {
+  "torch": "2.15.0+cpu",
+  "transformers": "5.24.1",
+  "python": "3.12.16",
+  "defer_and_fuse_env": "",
+  "torch_tpu": "?"
+ },
+ "saved_at": "2026-11-25 06:42:12",
+ "args": {
+  "device": null,
+  "model": "Qwen/Qwen3-0.6B",
+  "dtype": "float32",
+  "eager": "strict",
+  "temperature": 0.5,
+  "tokens": 60,
+  "batch": 256,
+  "topics": 0,
+  "seed": 0,
+  "tag": "",
+  "tiny": false,
+  "sizes": "8,32,64,128,224",
+  "loop_configs": 8,
+  "compile": true,
+  "backend": null
+ },
+ "prompts": 12,
+ "batch_rows": 256,
+ "A_loop": {
+  "configs": 8,
+  "seconds": 38.9216,
+  "configs_per_s": 0.2055
+ },
+ "warmup": {
+  "seconds": 27.9689,
+  "backend": "tpu",
+  "unique_graphs": 1,
+  "frames_ok": 1
+ },
+ "D_batched_compiled": [
+  {
+   "configs": 8,
+   "rows": 96,
+   "seconds": 3.8153,
+   "configs_per_s": 2.0968,
+   "speedup_vs_loop": 10.2036,
+   "new_graphs": 0
+  },
+  {
+   "configs": 32,
+   "rows": 384,
+   "seconds": 7.4523,
+   "configs_per_s": 4.294,
+   "speedup_vs_loop": 20.8953,
+   "new_graphs": 0
+  },
+  {
+   "configs": 64,
+   "rows": 768,
+   "seconds": 11.2408,
+   "configs_per_s": 5.6936,
+   "speedup_vs_loop": 27.7059,
+   "new_graphs": 0
+  },
+  {
+   "configs": 128,
+   "rows": 1536,
+   "seconds": 22.3648,
+   "configs_per_s": 5.7233,
+   "speedup_vs_loop": 27.8505,
+   "new_graphs": 0
+  },
+  {
+   "configs": 224,
+   "rows": 2688,
+   "seconds": 41.0686,
+   "configs_per_s": 5.4543,
+   "speedup_vs_loop": 26.5415,
+   "new_graphs": 0
+  }
+ ],
+ "zero_recompiles_after_warmup": true
+}

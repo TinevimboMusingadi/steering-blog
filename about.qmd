@@ -21,8 +21,8 @@ hundreds of experiments.
 - **Answer key.** Avishek Biswas, [`learn-mech-interp/03-steering`](https://github.com/avbiswas/learn-mech-interp/tree/main/03-steering) (MIT).
   The prompts, steering recipes and reference numbers quoted in this series come
   from there. Any numbers labelled "original repo" are theirs, not mine.
-- **Code.** The frozen, public code for the series will live at
-  `batched-steering-tpu` on GitHub.
+- **Code.** All code, results and logs for the series are in
+  [`llm-steering-tpu`](https://github.com/TinevimboMusingadi/llm-steering-tpu) on GitHub.
 - **Model.** Qwen3-0.6B [@qwen3]. Mood is scored with
   `j-hartmann/emotion-english-distilroberta-base` [@hartmann2022emotion].
 

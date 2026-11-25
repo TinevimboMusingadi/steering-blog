@@ -1,7 +1,7 @@
 ---
 title: "How fast is one pass?"
-subtitle: "Loop vs batched Strict vs DeferAndFuse"
-description: "Speed of batched steering on a TPU v5e-1: what batching buys, what DeferAndFuse doesn't, and how many settings it takes to fill the chip."
+subtitle: "Loop vs batched Strict vs DeferAndFuse vs torch.compile"
+description: "Speed of batched steering on a TPU v5e-1: what batching buys, what DeferAndFuse doesn't, what compiling the decode step adds, and how many settings it takes to fill the chip."
 date: 2026-11-27
 order: 6
 categories: [torchtpu, performance]
@@ -29,6 +29,13 @@ n_conf = [r["configs"] for r in B]
 a_cps = (bs["A_loop"]["configs_per_s"] + bd["A_loop"]["configs_per_s"]) / 2
 per_batch = bs["batch_rows"] // bs["prompts"]
 peakB = max(B, key=lambda r: r["configs_per_s"])
+
+bc = load("06-bench-compile.json")
+D = bc["D_batched_compiled"]
+peakD = max(D, key=lambda r: r["configs_per_s"])
+chk = load("07-check-mix-compile.json")
+same_c, all_c = chk["compile_equals_eager"]
+early = min(d["same_chars"] for d in chk["differences"] if d["what"] == "compile")
 ```
 
 ## The speed table
@@ -88,9 +95,11 @@ more and more settings at once. One batch holds `{python} bs["batch_rows"]` rows
 #| label: fig-scaling
 #| fig-cap: "Settings per second vs how many settings are swept at once (12 prompts each, batch of up to 256 rows). The dashed line is the one-at-a-time loop."
 fig, ax = line(n_conf, {"B Strict": [r["configs_per_s"] for r in B],
-                        "C DeferAndFuse": [r["configs_per_s"] for r in C]},
+                        "C DeferAndFuse": [r["configs_per_s"] for r in C],
+                        "D compiled decode step": [r["configs_per_s"] for r in D]},
                hlines={"A loop": a_cps},
-               colors={"B Strict": ROLE["steered"], "C DeferAndFuse": PALETTE["teal"], "A loop": ROLE["control"]},
+               colors={"B Strict": ROLE["steered"], "C DeferAndFuse": PALETTE["teal"],
+                       "D compiled decode step": PALETTE["orange"], "A loop": ROLE["control"]},
                xlabel="settings in the sweep", ylabel="settings / s",
                source="data/06-bench-*.json")
 ax.set_xscale("log", base=2); ax.set_xticks(n_conf, [str(n) for n in n_conf]); ax.set_ylim(0, None);
@@ -99,10 +108,11 @@ ax.set_xscale("log", base=2); ax.set_xticks(n_conf, [str(n) for n in n_conf]); a
 ```{python}
 #| echo: false
 #| output: asis
-print("| settings | rows | B Strict (settings/s) | C DeferAndFuse | speed-up of B vs loop |")
-print("|---|---|---|---|---|")
-for b, c in zip(B, C):
-    print(f"| {b['configs']} | {b['rows']:,} | {b['configs_per_s']:.2f} | {c['configs_per_s']:.2f} | {b['speedup_vs_loop']:.1f}× |")
+print("| settings | rows | B Strict (settings/s) | C DeferAndFuse | D compiled | B vs loop | D vs loop |")
+print("|---|---|---|---|---|---|---|")
+for b, c, d in zip(B, C, D):
+    print(f"| {b['configs']} | {b['rows']:,} | {b['configs_per_s']:.2f} | {c['configs_per_s']:.2f} | {d['configs_per_s']:.2f} "
+          f"| {b['speedup_vs_loop']:.1f}× | {d['speedup_vs_loop']:.1f}× |")
 ```
 
 Throughput climbs while the batch fills up, then flattens at about `{python} f"{peakB['configs_per_s']:.1f}"` settings/s, roughly `{python} f"{peakB['speedup_vs_loop']:.0f}"`× the loop (`{python} f"{a_cps:.2f}"` settings/s). With 8 settings the batch is only 96 rows and the chip
@@ -114,11 +124,38 @@ So for this model the rule is simple: sweep enough settings to fill whole batche
 rows, and beyond that the cost is linear. (In bf16, batches must stay at 128 rows or
 fewer for now; see [part 4](../04-one-row-per-experiment/index.qmd).)
 
-## Next: torch.compile and XProf
+## Mode D: compiling the decode step
 
-Two things were not measured in this sprint. The first is a fourth mode,
-`torch.compile(model, backend="tpu")`: its compile time, steady-state speed, and whether
-its outputs match the loop. The second is XProf traces of Strict and DeferAndFuse side by
-side, which would show where each decode step spends its time and what DeferAndFuse
-actually fuses. Both are the natural next step. The numbers above say batching is where
-most of the win is; whether compiling adds anything on top of the ~15× is still open.
+The fourth mode compiles only the one-token decode step with
+`torch.compile(..., backend="tpu", dynamic=False)`. Prefill stays eager; it runs once per
+batch. Two details made it compile once and then never again:
+
+- **Cache positions as device tensors.** The generation loop passes `cache_position` as a
+  slice of a preallocated tensor instead of letting the model work it out from a Python
+  integer, so step 7 and step 37 look like the same program.
+- **Same buffers every chunk.** The steering hook reads per-row buffers that are updated in
+  place with `.copy_()` (part 4), so new settings are new *values*, never new tensors.
+
+Warm-up (the first sweep, compile included) took `{python} f"{bc['warmup']['seconds']:.0f}"` s and produced
+`{python} bc['warmup']['unique_graphs']` graph. Every timed sweep after that added
+**`{python} sum(r['new_graphs'] for r in D)` new graphs**.
+
+At full batches mode D reaches **`{python} f"{peakD['configs_per_s']:.1f}"` settings/s**, which is
+`{python} f"{peakD['configs_per_s'] / peakB['configs_per_s']:.1f}"`× mode B and about
+`{python} f"{peakD['speedup_vs_loop']:.0f}"`× the loop measured in the same run. So unlike
+DeferAndFuse, compiling does pay: once a decode step is one compiled program, the per-op
+cost of eager mode (28 blocks × a few dozen small ops × 60 steps) goes away.
+
+**It is not bit-exact.** With greedy decoding, compiled and eager produced the same text in
+`{python} same_c` of `{python} all_c` heavily steered rows. In the other `{python} all_c - same_c` the text
+splits at some point, as early as character `{python} early`. The compiled program does
+its arithmetic in a different order, so when two next tokens are nearly tied the pick can flip,
+and greedy decoding then carries on from a different token. That doesn't make D wrong, but
+it means a compiled sweep is a *different sample* from an eager one, not a replay. For
+exact batched == loop checks we use B; for big sweeps D is the faster choice.
+
+## Still open: XProf
+
+XProf traces of B, C and D side by side would show where each decode step spends its
+time and what DeferAndFuse and the compiler actually fuse. That is the next thing to
+measure.

@@ -30,7 +30,8 @@ figures/                  static images (diagrams, XProf screenshots) and option
 | 03 First steps with TorchTPU and hooks | draft, complete (TPU facts filled in) |
 | 04 One row per experiment | draft, complete (TPU results) |
 | 05 Maps of the steering window | complete (E1 sad map + test check, E2 tomato map, E3 1,000-trial removal search) |
-| 06 How fast is one pass? | complete for modes A–C + scaling curve (torch.compile / XProf not measured) |
+| 06 How fast is one pass? | complete for modes A–D + scaling curve (XProf not measured) |
+| 07 Refusal, and two pushes at once | complete (stretch: E4 refusal direction, E5 sad + tomato mixing) |
 
 ## Preview locally
 
