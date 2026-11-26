@@ -8,6 +8,11 @@ categories: [steering, basics]
 image: ../../figures/favicon.svg
 ---
 
+::: {.callout-tip}
+## Prefer video?
+This series is also a [narrated video](https://youtu.be/kdMQFBj-awk); this part is the first chapter.
+:::
+
 Here is the whole trick, before any explanation:
 
 ```python
